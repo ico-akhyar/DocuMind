@@ -10,9 +10,7 @@ from datetime import datetime, timedelta
 import os
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-model = SentenceTransformer("models/all-MiniLM-L6-v2")
-# model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 
 def text_extract_pdf(path):

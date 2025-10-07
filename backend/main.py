@@ -29,7 +29,7 @@ app = FastAPI(title="RAG Document Processing API")
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://your-app.vercel.app"],
+    allow_origins=["http://localhost:3000", "https://akhyar919/DocuMind.hf.space", "https://huggingface.co"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,7 +39,7 @@ app.add_middleware(
 security = HTTPBearer()
 
 # Temporary storage
-UPLOAD_DIR = "temp_uploads"
+UPLOAD_DIR = "/tmp/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # In-memory session store (will be replaced with ChromaDB metadata)

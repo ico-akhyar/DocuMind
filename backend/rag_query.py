@@ -8,7 +8,7 @@ from llm_service import llm_service
 # Initialize components
 client = chromadb.PersistentClient(path="chroma_db")
 collection = client.get_collection("documents")
-model = SentenceTransformer("all-MiniLM-L6-v2")
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
 def get_relevant_chunks(query: str, user_id: str, session_id: str = None, n_results: int = 5):
     """
