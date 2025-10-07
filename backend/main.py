@@ -13,7 +13,7 @@ from typing import Optional, List, Dict, Any
 import asyncio
 from chromadb import PersistentClient
 from Data_Extraction import process_and_store
-from rag_query import query_rag, cleanup_expired_data
+from rag_query import query_rag, cleanup_expired_data, cleanup_session_data
 
 client = PersistentClient(path="chroma_db")
 
@@ -24,7 +24,7 @@ try:
 except:
     print("Firebase admin not initialized - using development mode")
 
-app = FastAPI(title="RAG Document Processing API")
+app = FastAPI(title="DocuMind API")
 
 # CORS for frontend
 app.add_middleware(
@@ -42,7 +42,7 @@ security = HTTPBearer()
 UPLOAD_DIR = "/tmp/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# In-memory session store (will be replaced with ChromaDB metadata)
+# In-memory session store
 user_sessions = {}
 
 # Models
@@ -69,6 +69,12 @@ class UserSession(BaseModel):
     expires_at: datetime
     files: List[str]
     is_private: bool
+
+class DocumentInfo(BaseModel):
+    filename: str
+    uploaded_at: str
+    document_type: str
+    chunk_count: int
 
 # Firebase Auth Dependency
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -98,25 +104,32 @@ def create_user_session(user_id: str, is_private: bool = False) -> str:
         files=[],
         is_private=is_private
     )
+    print(f"🆕 Created new session: {session_id}, expires at: {expires_at}")
     return session_id
 
 def validate_session(session_id: str, user_id: str) -> bool:
-    """Check if session is valid and belongs to user"""
+    """Check if session is valid and belongs to user - NEW LOGIC: Reset on activity"""
     if session_id not in user_sessions:
+        print(f"❌ Session not found: {session_id}")
         return False
+    
     session = user_sessions[session_id]
     
     # Check ownership
     if session.user_id != user_id:
+        print(f"❌ Session ownership mismatch: {session_id}")
         return False
     
     # Check expiration
     if datetime.now() > session.expires_at:
+        print(f"❌ Session expired: {session_id}")
+        cleanup_session_data(session_id)
         del user_sessions[session_id]
         return False
     
-    # Extend session
+    # NEW: Reset expiration timer on activity (extend by 30 minutes from NOW)
     session.expires_at = datetime.now() + timedelta(minutes=30)
+    print(f"🔄 Extended session: {session_id}, new expiry: {session.expires_at}")
     return True
 
 # Background cleanup task
@@ -127,48 +140,116 @@ async def background_cleanup():
         now = datetime.now()
         expired_sessions = []
         
+        print(f"🕒 Running background cleanup at {now}")
+        
         # Clean expired sessions
         for session_id, session in user_sessions.items():
             if now > session.expires_at:
                 expired_sessions.append(session_id)
         
         for session_id in expired_sessions:
-            print(f"Cleaning up expired session: {session_id}")
+            print(f"🧹 Cleaning up expired session: {session_id}")
             cleanup_session_data(session_id)
             del user_sessions[session_id]
+            print(f"✅ Deleted expired session: {session_id}")
         
         # Clean expired data from ChromaDB
         cleanup_expired_data()
-
-# Update the cleanup_session_data function
-def cleanup_session_data(session_id: str):
-    """Remove session data from ChromaDB"""
-    try:
-        # Delete all chunks with this session_id
-        collection = client.get_collection("documents")
-        session_docs = collection.get(where={"session_id": session_id})
         
-        if session_docs["ids"]:
-            collection.delete(ids=session_docs["ids"])
-            print(f"Deleted {len(session_docs['ids'])} chunks for session {session_id}")
-    except Exception as e:
-        print(f"Error cleaning session data: {e}")
+        print(f"✅ Cleanup completed. Active sessions: {len(user_sessions)}")
 
 def process_file_background(path, session_id=None, user_id=None, original_filename=None):
     try:
-        print(f"Processing file: {path}")
+        print(f"🔧 Processing file: {path}")
         process_and_store(path, session_id, user_id, original_filename)
-        os.remove(path)  # optional: clean temp file
+        # Clean up temporary file
+        if os.path.exists(path):
+            os.remove(path)
+            print(f"✅ Removed temporary file: {path}")
     except Exception as e:
-        print(f"[ERROR] Background processing failed: {e}")
+        print(f"❌ Background processing failed: {e}")
 
-# Updated upload endpoint with auth
+# NEW: Document management functions
+def get_user_documents(user_id: str):
+    """Get all documents for a user"""
+    try:
+        collection = client.get_collection("documents")
+        # Get both permanent and session documents
+        user_docs = collection.get(where={"user_id": user_id})
+        
+        # Group by filename and document type
+        documents_info = {}
+        for i, metadata in enumerate(user_docs['metadatas']):
+            filename = metadata.get('filename', 'Unknown')
+            doc_type = "PERMANENT" if metadata.get('is_permanent') else "SESSION"
+            created_at = metadata.get('created_at', '')
+            
+            if filename not in documents_info:
+                documents_info[filename] = {
+                    "filename": filename,
+                    "uploaded_at": created_at,
+                    "document_type": doc_type,
+                    "chunk_count": 0
+                }
+            
+            documents_info[filename]["chunk_count"] += 1
+        
+        return list(documents_info.values())
+    except Exception as e:
+        print(f"Error getting user documents: {e}")
+        return []
+
+def delete_user_document(user_id: str, filename: str):
+    """Delete all chunks of a specific document for a user"""
+    try:
+        collection = client.get_collection("documents")
+        # Find all chunks for this user and filename
+        docs_to_delete = collection.get(where={
+            "user_id": user_id,
+            "filename": filename
+        })
+        
+        if docs_to_delete["ids"]:
+            collection.delete(ids=docs_to_delete["ids"])
+            print(f"✅ Deleted {len(docs_to_delete['ids'])} chunks for document: {filename}")
+            return len(docs_to_delete["ids"])
+        else:
+            print(f"📭 No documents found for: {filename}")
+            return 0
+    except Exception as e:
+        print(f"Error deleting document: {e}")
+        return 0
+
+@app.get("/")
+async def root():
+    return {
+        "message": "DocuMind API", 
+        "status": "running",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
+@app.get("/docs")
+async def documentation():
+    """API documentation"""
+    return {
+        "endpoints": {
+            "POST /upload": "Upload documents for processing",
+            "POST /query": "Query your documents",
+            "GET /sessions": "Get user sessions", 
+            "DELETE /sessions/{session_id}": "Delete session",
+            "GET /documents": "Get user's documents",
+            "DELETE /documents/{filename}": "Delete a document",
+            "GET /health": "Health check"
+        }
+    }
+
 @app.post("/upload", response_model=UploadResponse)
 async def upload_file(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     is_private: bool = False,
-    user_id: str = Depends(get_current_user)  # Requires authentication
+    user_id: str = Depends(get_current_user)
 ):
     """
     Upload document - requires Firebase authentication
@@ -198,8 +279,9 @@ async def upload_file(
         # Process in background
         background_tasks.add_task(process_file_background, file_path, session_id, user_id, file.filename)
         
+        doc_type = "private session" if is_private else "public"
         return UploadResponse(
-            message=f"File '{file.filename}' uploaded successfully",
+            message=f"File '{file.filename}' uploaded successfully as {doc_type} document",
             file_id=file_id,
             session_id=session_id,
             status="processing"
@@ -208,8 +290,6 @@ async def upload_file(
     except Exception as e:
         raise HTTPException(500, f"Upload failed: {str(e)}")
 
-# Updated query endpoint with session validation
-# In main.py, update the query endpoint:
 @app.post("/query", response_model=QueryResponse)
 async def query_documents(
     request: QueryRequest,
@@ -240,7 +320,6 @@ async def query_documents(
         print(f"❌ Query error: {str(e)}")
         raise HTTPException(500, f"Query failed: {str(e)}")
 
-# Add these endpoints for session management
 @app.get("/sessions")
 async def get_user_sessions(user_id: str = Depends(get_current_user)):
     """Get user's active sessions"""
@@ -265,11 +344,80 @@ async def delete_session(session_id: str, user_id: str = Depends(get_current_use
         return {"message": "Session deleted"}
     raise HTTPException(404, "Session not found")
 
+# NEW: Document management endpoints
+@app.get("/documents")
+async def get_user_documents_endpoint(user_id: str = Depends(get_current_user)):
+    """Get user's documents"""
+    documents = get_user_documents(user_id)
+    return {"documents": documents}
+
+@app.delete("/documents/{filename}")
+async def delete_document(filename: str, user_id: str = Depends(get_current_user)):
+    """Delete a specific document"""
+    deleted_count = delete_user_document(user_id, filename)
+    if deleted_count > 0:
+        return {"message": f"Document '{filename}' deleted successfully", "chunks_deleted": deleted_count}
+    else:
+        raise HTTPException(404, f"Document '{filename}' not found")
+
 # Start background cleanup on startup
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(background_cleanup())
+    print("🚀 DocuMind API started with background cleanup")
+
+@app.get("/debug/cleanup")
+async def debug_cleanup():
+    """Manual trigger for cleanup (for testing)"""
+    try:
+        # Clean expired sessions
+        now = datetime.now()
+        expired_sessions = []
+        
+        for session_id, session in user_sessions.items():
+            if now > session.expires_at:
+                expired_sessions.append(session_id)
+        
+        for session_id in expired_sessions:
+            cleanup_session_data(session_id)
+            del user_sessions[session_id]
+        
+        # Clean ChromaDB
+        cleanup_expired_data()
+        
+        return {
+            "message": "Cleanup completed",
+            "expired_sessions_cleaned": len(expired_sessions),
+            "active_sessions": len(user_sessions)
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now()}
+    import os
+    # Check ChromaDB size
+    chroma_size = 0
+    if os.path.exists("chroma_db"):
+        for dirpath, dirnames, filenames in os.walk("chroma_db"):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                chroma_size += os.path.getsize(fp)
+    
+    # Get document counts
+    collection = client.get_collection("documents")
+    all_docs = collection.get()
+    permanent_count = sum(1 for meta in all_docs['metadatas'] if meta.get('is_permanent'))
+    session_count = len(all_docs['metadatas']) - permanent_count
+    
+    return {
+        "status": "healthy", 
+        "timestamp": datetime.now(),
+        "chroma_db_size_mb": f"{chroma_size / (1024*1024):.2f}",
+        "active_sessions": len(user_sessions),
+        "documents": {
+            "permanent": permanent_count,
+            "session": session_count,
+            "total": len(all_docs['metadatas'])
+        }
+    }

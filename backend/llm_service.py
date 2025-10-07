@@ -1,6 +1,5 @@
 # llm_service.py
 import os
-from openai import OpenAI
 from typing import List
 from dotenv import load_dotenv
 
@@ -19,17 +18,48 @@ class LLMService:
         """Initialize OpenAI client if API key is available"""
         if self.OPENAI_API_KEY:
             try:
-                self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
-                # Test the connection
-                self.openai_client.models.list()
-                self.USE_OPENAI = True
-                print("✅ OpenAI configured successfully!")
+                print(f"🔑 OpenAI API Key found: {self.OPENAI_API_KEY[:10]}...")
+                
+                # APPROACH 1: Try direct API calls without the client
+                import openai
+                
+                # Set the API key directly
+                openai.api_key = self.OPENAI_API_KEY
+                
+                # Test with a direct API call
+                import requests
+                headers = {
+                    "Authorization": f"Bearer {self.OPENAI_API_KEY}",
+                    "Content-Type": "application/json"
+                }
+                
+                test_data = {
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": "Say 'test'"}],
+                    "max_tokens": 5
+                }
+                
+                response = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    json=test_data,
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    print("✅ OpenAI direct API test successful!")
+                    self.USE_OPENAI = True
+                    self.openai_client = openai  # Use the module directly
+                else:
+                    print(f"❌ OpenAI API test failed: {response.status_code} - {response.text}")
+                    self.USE_OPENAI = False
+                
             except Exception as e:
                 print(f"❌ OpenAI configuration failed: {e}")
                 self.USE_OPENAI = False
-                self.openai_client = None
         else:
-            print("❌ OPENAI_API_KEY not found - using simple RAG responses")
+            print("❌ OPENAI_API_KEY not found in environment variables")
+            self.USE_OPENAI = False
     
     def generate_answer(self, query: str, relevant_chunks: List[str]) -> str:
         """
@@ -38,7 +68,7 @@ class LLMService:
         if not relevant_chunks:
             return "I couldn't find any relevant information in your documents to answer this question."
         
-        if self.USE_OPENAI and self.openai_client:
+        if self.USE_OPENAI:
             return self._generate_openai_answer(query, relevant_chunks)
         else:
             return self._generate_simple_answer(query, relevant_chunks)
@@ -58,7 +88,7 @@ class LLMService:
 
 Question: {query}
 
-Note: For more detailed and intelligent answers, please configure an LLM service."""
+Note: OpenAI service is currently unavailable. Please check configuration."""
     
     def _generate_openai_answer(self, query: str, relevant_chunks: List[str]) -> str:
         """
@@ -89,9 +119,17 @@ IMPORTANT INSTRUCTIONS:
 Please provide a comprehensive answer:"""
 
         try:
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o-mini",  # You can change to "gpt-3.5-turbo" for cost savings
-                messages=[
+            # Use direct API call to avoid client issues
+            import requests
+            
+            headers = {
+                "Authorization": f"Bearer {self.OPENAI_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            
+            data = {
+                "model": "gpt-4o-mini",
+                "messages": [
                     {
                         "role": "system", 
                         "content": """You are a helpful assistant that provides accurate answers based only on the given context. 
@@ -103,14 +141,26 @@ Please provide a comprehensive answer:"""
                         "content": prompt
                     }
                 ],
-                max_tokens=800,
-                temperature=0.1,  # Low temperature for factual responses
-                top_p=0.9
+                "max_tokens": 800,
+                "temperature": 0.1,
+                "top_p": 0.9
+            }
+            
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=30
             )
             
-            answer = response.choices[0].message.content.strip()
-            print(f"✅ OpenAI response generated successfully")
-            return answer
+            if response.status_code == 200:
+                result = response.json()
+                answer = result['choices'][0]['message']['content'].strip()
+                print(f"✅ OpenAI response generated successfully")
+                return answer
+            else:
+                print(f"❌ OpenAI API error: {response.status_code} - {response.text}")
+                return self._generate_simple_answer(query, relevant_chunks)
             
         except Exception as e:
             print(f"❌ OpenAI API error: {e}")

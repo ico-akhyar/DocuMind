@@ -142,7 +142,6 @@ def embed_chunks(chunks):
 
 
 
-
 client = chromadb.PersistentClient(path="chroma_db")
 if "documents" in [c.name for c in client.list_collections()]:
     collection = client.get_collection("documents")
@@ -153,15 +152,27 @@ else:
 def store_in_chroma_with_session(chunks, session_id=None, user_id=None):
     ids = [f"{c['filename']}_{c['chunk_id']}" for c in chunks]
     docs = [c["chunk"] for c in chunks]
+    
+    # NEW LOGIC: Different expiration based on document type
+    if session_id:
+        # Private session documents: 30 minutes from now
+        expires_at = (datetime.now() + timedelta(minutes=30)).isoformat()
+        is_permanent = False
+    else:
+        # Public documents: 14 days from now
+        expires_at = (datetime.now() + timedelta(days=14)).isoformat()
+        is_permanent = True
+    
     metas = [{
-        "filename": c["filename"],  # This should be the original filename
+        "filename": c["filename"],
         "page": c["page"], 
         "chunk_id": c["chunk_id"],
         "doctype": c["doctype"],
         "session_id": session_id,
         "user_id": user_id,  
         "created_at": datetime.now().isoformat(),
-        "expires_at": (datetime.now() + timedelta(minutes=30)).isoformat() if session_id else None
+        "expires_at": expires_at,
+        "is_permanent": is_permanent  # Track document type
     } for c in chunks]
     embs = [c["embedding"] for c in chunks]
 
@@ -172,10 +183,10 @@ def store_in_chroma_with_session(chunks, session_id=None, user_id=None):
             ids=ids,
             embeddings=embs,
         )
+        print(f"💾 Stored {len(chunks)} chunks (type: {'PERMANENT' if is_permanent else 'SESSION'})")
     except Exception as e:
         print(f"Error storing in ChromaDB: {e}")
 
-# Update process_and_store
 def process_and_store(path, session_id=None, user_id=None, original_filename=None):
     print(f"🔍 Starting processing for: {path}")
     chunks = chunking(path)

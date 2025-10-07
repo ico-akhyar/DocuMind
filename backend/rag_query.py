@@ -2,8 +2,9 @@
 import chromadb
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from llm_service import llm_service
+import os
 
 # Initialize components
 client = chromadb.PersistentClient(path="chroma_db")
@@ -16,31 +17,21 @@ def get_relevant_chunks(query: str, user_id: str, session_id: str = None, n_resu
     """
     print(f"🔍 Searching for user: {user_id}, session: {session_id}")
     
-    # Enhance query for better retrieval
-    enhanced_query = query
-    query_lower = query.lower()
-    
-    if "rag" in query_lower:
-        enhanced_query = query + " retrieval augmented generation systems models documents context"
-    elif "ml" in query_lower or "machine learning" in query_lower:
-        enhanced_query = query + " machine learning AI artificial intelligence algorithms"
-    elif "ai" in query_lower or "artificial intelligence" in query_lower:
-        enhanced_query = query + " artificial intelligence AI machine learning deep learning"
-    
-    print(f"🎯 Enhanced query: {enhanced_query}")
-    
     # Generate query embedding
-    query_embedding = model.encode([enhanced_query]).tolist()[0]
+    query_embedding = model.encode([query]).tolist()[0]
     
-    # Build filter
-    where_filter = {"user_id": user_id}
+    # Build filter - NEW LOGIC: Include both permanent and session documents
     if session_id:
+        # For session queries: include both permanent docs AND current session docs
         where_filter = {
-            "$and": [
-                {"user_id": user_id},
-                {"session_id": session_id}
+            "$or": [
+                {"user_id": user_id, "is_permanent": True},  # All permanent docs
+                {"user_id": user_id, "session_id": session_id}  # Current session docs
             ]
         }
+    else:
+        # For public queries: only permanent documents
+        where_filter = {"user_id": user_id, "is_permanent": True}
     
     try:
         results = collection.query(
@@ -51,13 +42,6 @@ def get_relevant_chunks(query: str, user_id: str, session_id: str = None, n_resu
         )
         
         print(f"📊 Found {len(results['documents'][0]) if results and results['documents'] else 0} results")
-        
-        # Debug: Show what we found
-        if results and results['documents']:
-            for i, doc in enumerate(results['documents'][0]):
-                similarity = 1 / (1 + results['distances'][0][i]) if results['distances'] else 0.8
-                print(f"   📄 Result {i+1} (score: {similarity:.3f}): {doc[:100]}...")
-        
         return results
     except Exception as e:
         print(f"❌ Error querying ChromaDB: {e}")
@@ -97,7 +81,8 @@ def query_rag(query: str, user_id: str, session_id: str = None) -> Tuple[str, Li
             "chunk_id": metadata.get("chunk_id", 0),
             "content_preview": doc[:150] + "..." if len(doc) > 150 else doc,
             "similarity_score": round(similarity_score, 3),
-            "session_id": metadata.get("session_id", "public")
+            "session_id": metadata.get("session_id", "public"),
+            "document_type": "PERMANENT" if metadata.get("is_permanent") else "SESSION"
         })
     
     # Sort sources by similarity score (highest first)
@@ -108,16 +93,20 @@ def query_rag(query: str, user_id: str, session_id: str = None) -> Tuple[str, Li
     
     return answer, sources
 
-# Utility function for cleanup
 def cleanup_expired_data():
     """
-    Clean up expired session data from ChromaDB
+    Clean up expired data from ChromaDB - NEW LOGIC
     """
     try:
         now = datetime.now()
+        print(f"🧹 Running cleanup at {now}")
         
-        # Get all documents with expiration
+        # Get all documents
         all_docs = collection.get()
+        
+        if not all_docs['ids']:
+            print("📭 No documents found in ChromaDB")
+            return
         
         expired_ids = []
         for i, metadata in enumerate(all_docs['metadatas']):
@@ -127,12 +116,100 @@ def cleanup_expired_data():
                     expires_at = datetime.fromisoformat(expires_at_str)
                     if now > expires_at:
                         expired_ids.append(all_docs['ids'][i])
-                except ValueError:
-                    continue  # Skip if date format is invalid
+                        doc_type = "PERMANENT" if metadata.get('is_permanent') else "SESSION"
+                        print(f"🗑️ Marking for deletion: {all_docs['ids'][i]} ({doc_type}, expired at {expires_at})")
+                except ValueError as e:
+                    print(f"⚠️ Invalid date format for document {all_docs['ids'][i]}: {expires_at_str}")
+                    continue
         
         if expired_ids:
             print(f"🧹 Cleaning up {len(expired_ids)} expired documents")
             collection.delete(ids=expired_ids)
+            print(f"✅ Successfully deleted {len(expired_ids)} expired documents")
+        else:
+            print("✅ No expired documents found")
+        
+        # Check storage usage and clean older data if needed
+        check_and_clean_storage()
             
     except Exception as e:
-        print(f"Error cleaning expired data: {e}")
+        print(f"❌ Error cleaning expired data: {e}")
+
+def cleanup_session_data(session_id: str):
+    """Remove session data from ChromaDB"""
+    try:
+        print(f"🧹 Cleaning up session data for: {session_id}")
+        
+        # Get all documents with this session_id
+        session_docs = collection.get(where={"session_id": session_id})
+        
+        if session_docs["ids"]:
+            print(f"🗑️ Deleting {len(session_docs['ids'])} chunks for session {session_id}")
+            collection.delete(ids=session_docs["ids"])
+            print(f"✅ Successfully deleted {len(session_docs['ids'])} chunks for session {session_id}")
+        else:
+            print(f"📭 No documents found for session {session_id}")
+            
+    except Exception as e:
+        print(f"❌ Error cleaning session data: {e}")
+
+def check_and_clean_storage():
+    """
+    Check storage usage and clean older data if storage is getting high
+    """
+    try:
+        # Check ChromaDB directory size
+        chroma_dir = "chroma_db"
+        total_size = 0
+        
+        if os.path.exists(chroma_dir):
+            for dirpath, dirnames, filenames in os.walk(chroma_dir):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    total_size += os.path.getsize(fp)
+        
+        # Convert to MB
+        size_mb = total_size / (1024 * 1024)
+        print(f"📊 Current ChromaDB size: {size_mb:.2f} MB")
+        
+        # If storage exceeds 100MB, clean older data
+        if size_mb > 100:
+            print("⚠️ Storage limit approaching, cleaning older data...")
+            clean_older_data()
+            
+    except Exception as e:
+        print(f"❌ Error checking storage: {e}")
+
+def clean_older_data():
+    """
+    Clean older session documents first when storage is full
+    """
+    try:
+        cutoff_time = datetime.now() - timedelta(hours=1)
+        print(f"🗑️ Cleaning session data older than {cutoff_time}")
+        
+        # Get only session documents (non-permanent)
+        session_docs = collection.get(where={"is_permanent": False})
+        old_ids = []
+        
+        for i, metadata in enumerate(session_docs['metadatas']):
+            created_at_str = metadata.get('created_at')
+            if created_at_str:
+                try:
+                    created_at = datetime.fromisoformat(created_at_str)
+                    if created_at < cutoff_time:
+                        old_ids.append(session_docs['ids'][i])
+                        print(f"🗑️ Marking old session document: {session_docs['ids'][i]} (created at {created_at})")
+                except ValueError:
+                    print(f"⚠️ Invalid date format for document {session_docs['ids'][i]}: {created_at_str}")
+                    continue
+        
+        if old_ids:
+            print(f"🗑️ Cleaning {len(old_ids)} old session documents to free space")
+            collection.delete(ids=old_ids)
+            print(f"✅ Successfully deleted {len(old_ids)} old session documents")
+        else:
+            print("✅ No old session documents found")
+            
+    except Exception as e:
+        print(f"❌ Error cleaning older data: {e}")
