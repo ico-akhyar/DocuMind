@@ -40,13 +40,14 @@ export default function Header() {
               <div className="relative">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                   <img 
-                    src="./logo.png" 
+                    src="logo.png" 
                     alt="DocuMind Logo" 
                     className="w-8 h-8 object-contain"
                     onError={(e) => {
                       // Fallback to text if logo fails to load
                       e.currentTarget.style.display = 'none';
-                      e.currentTarget.nextSibling?.style.display = 'flex';
+                      const next = e.currentTarget.nextSibling as HTMLElement | null;
+                      if (next) next.style.display = 'flex';
                     }}
                   />
                   <div className="hidden w-8 h-8 items-center justify-center">
