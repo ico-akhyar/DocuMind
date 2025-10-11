@@ -45,8 +45,9 @@ export default function Header() {
                     className="w-8 h-8 object-contain"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
-                      e.currentTarget.nextSibling?.style.display = 'flex';
-                    }}
+                      const next = e.currentTarget.nextSibling as HTMLElement | null;
+                      if (next) next.style.display = 'flex';
+                    }}                    
                   />
                   <div className="hidden w-8 h-8 items-center justify-center">
                     <span className="text-white font-bold text-lg">D</span>
