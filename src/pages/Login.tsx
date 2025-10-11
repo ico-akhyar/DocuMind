@@ -43,13 +43,14 @@ export default function Login() {
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl blur-lg group-hover:blur-xl transition-all duration-300 opacity-75 group-hover:opacity-100"></div>
               <div className="relative w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-700 rounded-2xl flex items-center justify-center shadow-2xl group-hover:shadow-3xl transition-all duration-300 group-hover:scale-105">
-                <img 
-                  src="/logo.png" 
-                  alt="DocuMind Logo" 
+                <img
+                  src="/logo.png"
+                  alt="DocuMind Logo"
                   className="w-10 h-10 object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextSibling?.style.display = 'flex';
+                    const next = e.currentTarget.nextSibling as HTMLElement | null;
+                    if (next) next.style.display = 'flex';
                   }}
                 />
                 <div className="hidden w-10 h-10 items-center justify-center">
@@ -61,7 +62,7 @@ export default function Login() {
               </div>
             </div>
           </div>
-          
+
           <h2 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 dark:from-white dark:via-blue-200 dark:to-purple-200 bg-clip-text text-transparent">
             Welcome Back
           </h2>
@@ -149,8 +150,8 @@ export default function Login() {
             <div className="text-center pt-4">
               <p className="text-gray-600 dark:text-gray-400 font-medium">
                 Don't have an account?{' '}
-                <Link 
-                  to="/register" 
+                <Link
+                  to="/register"
                   className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-bold transition-all duration-300 hover:underline"
                 >
                   Sign up now
