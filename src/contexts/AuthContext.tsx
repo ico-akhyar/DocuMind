@@ -14,6 +14,7 @@ interface AuthContextType {
   signup: (email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  // CHANGED: getToken is no longer essential for the API calls but kept for potential other uses
   getToken: () => Promise<string | null>;
 }
 
@@ -41,27 +42,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     await firebaseSignOut(auth);
-    localStorage.removeItem('authToken');
+    // REMOVED: No longer need to manually remove the token from localStorage
+    // localStorage.removeItem('authToken');
   };
 
   const getToken = async (): Promise<string | null> => {
-    if (currentUser) {
-      const token = await currentUser.getIdToken();
-      localStorage.setItem('authToken', token);
+    if (auth.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      // REMOVED: We don't store the token in localStorage anymore
+      // localStorage.setItem('authToken', token);
       return token;
     }
     return null;
   };
 
   useEffect(() => {
+    // This listener now just sets the current user state.
+    // Token management is handled dynamically by the api.ts interceptor.
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      (async () => {
-        setCurrentUser(user);
-        if (user) {
-          await getToken();
-        }
-        setLoading(false);
-      })();
+      setCurrentUser(user);
+      setLoading(false);
     });
 
     return unsubscribe;
