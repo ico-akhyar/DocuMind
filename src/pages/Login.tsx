@@ -49,8 +49,9 @@ export default function Login() {
                   className="w-10 h-10 object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextSibling?.style.display = 'flex';
-                  }}
+                    const next = e.currentTarget.nextSibling as HTMLElement | null;
+                    if (next) next.style.display = 'flex';
+                  }}                  
                 />
                 <div className="hidden w-10 h-10 items-center justify-center">
                   <span className="text-white font-bold text-xl">D</span>
