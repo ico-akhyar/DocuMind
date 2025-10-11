@@ -63,13 +63,14 @@ export default function Register() {
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-3xl blur-lg group-hover:blur-xl transition-all duration-300 opacity-75 group-hover:opacity-100"></div>
               <div className="relative w-20 h-20 bg-gradient-to-br from-purple-600 to-pink-700 rounded-2xl flex items-center justify-center shadow-2xl group-hover:shadow-3xl transition-all duration-300 group-hover:scale-105">
-                <img 
-                  src="/logo.png" 
-                  alt="DocuMind Logo" 
+                <img
+                  src="/logo.png"
+                  alt="DocuMind Logo"
                   className="w-10 h-10 object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextSibling?.style.display = 'flex';
+                    const next = e.currentTarget.nextSibling as HTMLElement | null;
+                    if (next) next.style.display = 'flex';
                   }}
                 />
                 <div className="hidden w-10 h-10 items-center justify-center">
@@ -81,7 +82,7 @@ export default function Register() {
               </div>
             </div>
           </div>
-          
+
           <h2 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-purple-900 to-pink-900 dark:from-white dark:via-purple-200 dark:to-pink-200 bg-clip-text text-transparent">
             Join DocuMind
           </h2>
@@ -145,7 +146,7 @@ export default function Register() {
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                
+
                 {/* Password Strength Meter */}
                 {password && (
                   <div className="mt-3 space-y-2">
@@ -159,7 +160,7 @@ export default function Register() {
                       </span>
                     </div>
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div 
+                      <div
                         className={`h-2 rounded-full transition-all duration-500 ${passwordStrength.color}`}
                         style={{ width: `${passwordStrength.strength}%` }}
                       ></div>
@@ -191,7 +192,7 @@ export default function Register() {
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-                
+
                 {/* Password Match Indicator */}
                 {confirmPassword && (
                   <div className="mt-2 flex items-center gap-2 text-sm">
@@ -232,8 +233,8 @@ export default function Register() {
             <div className="text-center pt-4">
               <p className="text-gray-600 dark:text-gray-400 font-medium">
                 Already have an account?{' '}
-                <Link 
-                  to="/login" 
+                <Link
+                  to="/login"
                   className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-bold transition-all duration-300 hover:underline"
                 >
                   Sign in here
