@@ -479,61 +479,31 @@ const DocuMind: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 sm:py-20 lg:py-32 bg-gradient-to-br from-purple-900 via-blue-900 to-gray-900 text-white px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6">
-            Ready to Get Started?
-          </h2>
-          <p className="text-xl md:text-2xl mb-8 sm:mb-12 opacity-90">
-            Join developers worldwide using our free RAG API to build intelligent document applications.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
-            <Link
-              to="/api"
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105"
-            >
-              <Code className="mr-3 h-6 w-6" />
-              Explore API
-            </Link>
-            <Link
-              to="/register"
-              className="inline-flex items-center justify-center px-8 py-4 border-2 border-white text-white font-bold rounded-xl hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105"
-            >
-              Start Building Now
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">DM</span>
-              </div>
-              <span className="text-lg font-bold">DocuMind</span>
-            </div>
-            <div className="flex space-x-6">
-              <Link to="/" className="text-gray-400 hover:text-white transition-colors">
-                Home
-              </Link>
-              <Link to="/api" className="text-gray-400 hover:text-white transition-colors">
-                API
-              </Link>
-              <Link to="/login" className="text-gray-400 hover:text-white transition-colors">
-                Sign In
-              </Link>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center">
-            <p className="text-gray-400">
-              © 2025 DocuMind. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
+<section className="py-16 sm:py-20 lg:py-32 bg-gradient-to-br from-purple-900 via-blue-900 to-gray-900 text-white px-4 sm:px-6 lg:px-8">
+  <div className="max-w-4xl mx-auto text-center">
+    <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6">
+      Ready to Get Started?
+    </h2>
+    <p className="text-xl md:text-2xl mb-8 sm:mb-12 opacity-90">
+      Join developers worldwide using our free RAG API to build intelligent document applications.
+    </p>
+    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
+      <Link
+        to="/api#endpoints"
+        className="inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105"
+      >
+        <Code className="mr-3 h-6 w-6" />
+        Explore API
+      </Link>
+      <Link
+        to="/register"
+        className="inline-flex items-center justify-center px-8 py-4 border-2 border-white text-white font-bold rounded-xl hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105"
+      >
+        Start Building Now
+      </Link>
+    </div>
+  </div>
+</section>
     </div>
   );
 };

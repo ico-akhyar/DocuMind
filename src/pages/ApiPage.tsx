@@ -142,11 +142,11 @@ const ApiPage: React.FC = () => {
               View Endpoints
             </a>
             <Link
-              to="/register"
-              className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold rounded-xl transition-colors"
-            >
-              Get API Key
-            </Link>
+    to="/register"
+    className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold rounded-xl transition-colors"
+  >
+    Get API Key
+  </Link>
           </div>
         </div>
       </section>
@@ -368,11 +368,11 @@ const ApiPage: React.FC = () => {
                 </div>
                 
                 <Link
-                  to="/register"
-                  className="inline-flex items-center justify-center w-full py-3 bg-white text-green-600 rounded-xl font-bold hover:bg-gray-100 transition-colors"
-                >
-                  {freePlan.cta}
-                </Link>
+  to="/register"
+  className="inline-flex items-center justify-center w-full py-3 bg-white text-green-600 rounded-xl font-bold hover:bg-gray-100 transition-colors"
+>
+  {freePlan.cta}
+</Link>
               </div>
             </div>
           </div>
@@ -445,36 +445,6 @@ const ApiPage: React.FC = () => {
           )}
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-sm">DM</span>
-              </div>
-              <span className="text-lg font-bold">DocuMind</span>
-            </div>
-            <div className="flex space-x-6">
-              <Link to="/" className="text-gray-400 hover:text-white transition-colors">
-                Home
-              </Link>
-              <Link to="/api" className="text-gray-400 hover:text-white transition-colors">
-                API
-              </Link>
-              <Link to="/login" className="text-gray-400 hover:text-white transition-colors">
-                Sign In
-              </Link>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center">
-            <p className="text-gray-400">
-              © 2024 DocuMind. All rights reserved.
-            </p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
