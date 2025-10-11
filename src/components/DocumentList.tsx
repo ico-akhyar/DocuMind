@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FileText, Trash2, Clock, HardDrive } from 'lucide-react';
+import { FileText, Trash2, Clock, HardDrive, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { getDocuments, deleteDocument } from '../services/api';
 
 interface Document {
@@ -16,23 +16,42 @@ interface DocumentListProps {
 export default function DocumentList({ refreshTrigger }: DocumentListProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [deleteModal, setDeleteModal] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [refreshSuccess, setRefreshSuccess] = useState(false);
 
   const fetchDocuments = async () => {
     try {
+      if (documents.length === 0) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+      
       const response = await getDocuments();
       setDocuments(response.data);
+      setLastRefreshed(new Date());
+      setRefreshSuccess(true);
+      
+      // Auto-hide success indicator after 2 seconds
+      setTimeout(() => setRefreshSuccess(false), 2000);
     } catch (err) {
       console.error('Failed to fetch documents:', err);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     fetchDocuments();
   }, [refreshTrigger]);
+
+  const handleRefresh = async () => {
+    await fetchDocuments();
+  };
 
   const handleDelete = async (filename: string) => {
     setDeleting(true);
@@ -50,9 +69,23 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
   const permanentDocs = documents.filter((doc) => doc.document_type === 'PERMANENT');
   const sessionDocs = documents.filter((doc) => doc.document_type === 'SESSION');
 
+  const formatTimeSince = (date: Date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  };
+
   if (loading) {
     return (
       <div className="bg-theme-surface rounded-xl shadow-lg p-6 border border-theme-secondary">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-semibold text-theme-primary">Your Documents</h3>
+          <div className="w-6 h-6 border-2 border-theme-secondary border-t-blue-600 rounded-full animate-spin"></div>
+        </div>
         <div className="animate-pulse space-y-4">
           <div className="h-4 bg-theme-secondary rounded w-1/4"></div>
           <div className="h-16 bg-theme-secondary rounded"></div>
@@ -65,7 +98,34 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
   return (
     <>
       <div className="bg-theme-surface rounded-xl shadow-lg p-6 border border-theme-secondary transition-all duration-300 hover:shadow-xl">
-        <h3 className="text-xl font-semibold text-theme-primary mb-4">Your Documents</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-semibold text-theme-primary">Your Documents</h3>
+          <div className="flex items-center gap-3">
+            {lastRefreshed && (
+              <span className="text-xs text-theme-secondary font-medium">
+                Updated {formatTimeSince(lastRefreshed)}
+              </span>
+            )}
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className={`p-2 rounded-lg transition-all duration-200 ${
+                refreshing 
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
+                  : 'bg-theme-secondary hover:bg-theme-accent text-theme-primary hover:text-blue-600'
+              } disabled:opacity-50`}
+              title="Refresh documents"
+            >
+              {refreshing ? (
+                <RefreshCw className="h-4 w-4 animate-spin" />
+              ) : refreshSuccess ? (
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        </div>
 
         {documents.length === 0 ? (
           <div className="text-center py-8">
@@ -75,6 +135,15 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
           </div>
         ) : (
           <div className="space-y-6">
+            {refreshing && (
+              <div className="flex items-center justify-center py-2">
+                <div className="flex items-center gap-2 text-blue-600 text-sm">
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  <span>Refreshing documents...</span>
+                </div>
+              </div>
+            )}
+
             {permanentDocs.length > 0 && (
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -159,6 +228,8 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
 }
 
 function DocumentCard({ doc, onDelete }: { doc: Document; onDelete: (filename: string) => void }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -188,8 +259,18 @@ function DocumentCard({ doc, onDelete }: { doc: Document; onDelete: (filename: s
     }
   };
 
+  const handleDeleteClick = () => {
+    setIsDeleting(true);
+    setTimeout(() => {
+      onDelete(doc.filename);
+      setIsDeleting(false);
+    }, 300);
+  };
+
   return (
-    <div className="flex items-center gap-3 p-4 bg-theme-primary hover:bg-theme-accent rounded-xl transition-all duration-300 group border border-theme-secondary hover:border-theme-accent hover:shadow-md">
+    <div className={`flex items-center gap-3 p-4 bg-theme-primary hover:bg-theme-accent rounded-xl transition-all duration-300 group border border-theme-secondary hover:border-theme-accent hover:shadow-md ${
+      isDeleting ? 'opacity-50 scale-95' : ''
+    }`}>
       <div className="flex-shrink-0">
         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
           {getDocumentIcon(doc.filename)}
@@ -218,11 +299,16 @@ function DocumentCard({ doc, onDelete }: { doc: Document; onDelete: (filename: s
       </div>
       
       <button
-        onClick={() => onDelete(doc.filename)}
-        className="p-2 text-theme-secondary hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0"
+        onClick={handleDeleteClick}
+        disabled={isDeleting}
+        className="p-2 text-theme-secondary hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 disabled:opacity-50"
         title="Delete document"
       >
-        <Trash2 className="h-4 w-4" />
+        {isDeleting ? (
+          <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+        ) : (
+          <Trash2 className="h-4 w-4" />
+        )}
       </button>
     </div>
   );

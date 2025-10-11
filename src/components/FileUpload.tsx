@@ -66,7 +66,11 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     try {
       await uploadDocument(selectedFile, isPermanent);
       setSelectedFile(null);
+      
+      // ADDED: Call the success callback to refresh document list
       onUploadSuccess();
+      
+      // ADDED: Reset file input
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Upload failed');
@@ -147,7 +151,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
                 type="checkbox"
                 id="isPermanent"
                 checked={isPermanent}
-                onChange={(e) => setIsPermanent(e.target.checked)}
+                onChange={(e) => setIsPmanent(e.target.checked)}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
               <label htmlFor="isPermanent" className="text-sm text-gray-700 dark:text-gray-300">
