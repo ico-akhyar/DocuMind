@@ -31,23 +31,23 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     // Update CSS custom properties based on theme
     const root = document.documentElement;
     if (theme === 'dark') {
-      // Dark theme colors
-      root.style.setProperty('--color-background', '#000000');
-      root.style.setProperty('--color-surface', '#1A237E');
-      root.style.setProperty('--color-primary', '#191970');
-      root.style.setProperty('--color-secondary', '#2E1065');
-      root.style.setProperty('--color-accent', '#4C1D95');
-      root.style.setProperty('--color-text-primary', '#FFFFFF');
+      // Dark theme colors - improved contrast
+      root.style.setProperty('--color-background', '#111827');
+      root.style.setProperty('--color-surface', '#1F2937');
+      root.style.setProperty('--color-primary', '#374151');
+      root.style.setProperty('--color-secondary', '#4B5563');
+      root.style.setProperty('--color-accent', '#6B7280');
+      root.style.setProperty('--color-text-primary', '#F9FAFB');
       root.style.setProperty('--color-text-secondary', '#E5E7EB');
     } else {
-      // Light theme colors
+      // Light theme colors - improved contrast
       root.style.setProperty('--color-background', '#FFFFFF');
       root.style.setProperty('--color-surface', '#F8F9FA');
-      root.style.setProperty('--color-primary', '#E3F2FD');
-      root.style.setProperty('--color-secondary', '#E9ECEF');
-      root.style.setProperty('--color-accent', '#BBDEFB');
-      root.style.setProperty('--color-text-primary', '#000000');
-      root.style.setProperty('--color-text-secondary', '#4B5563');
+      root.style.setProperty('--color-primary', '#E5E7EB');
+      root.style.setProperty('--color-secondary', '#D1D5DB');
+      root.style.setProperty('--color-accent', '#9CA3AF');
+      root.style.setProperty('--color-text-primary', '#111827');
+      root.style.setProperty('--color-text-secondary', '#374151');
     }
   }, [theme]);
 
