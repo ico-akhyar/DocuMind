@@ -28,20 +28,26 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
     
-    // Update CSS custom properties
+    // Update CSS custom properties based on theme
     const root = document.documentElement;
     if (theme === 'dark') {
-      root.style.setProperty('--color-primary', '#1A237E');
-      root.style.setProperty('--color-secondary', '#191970');
-      root.style.setProperty('--color-accent', '#2E1065');
+      // Dark theme colors
       root.style.setProperty('--color-background', '#000000');
-      root.style.setProperty('--color-surface', '#111827');
+      root.style.setProperty('--color-surface', '#1A237E');
+      root.style.setProperty('--color-primary', '#191970');
+      root.style.setProperty('--color-secondary', '#2E1065');
+      root.style.setProperty('--color-accent', '#4C1D95');
+      root.style.setProperty('--color-text-primary', '#FFFFFF');
+      root.style.setProperty('--color-text-secondary', '#E5E7EB');
     } else {
-      root.style.setProperty('--color-primary', '#E3F2FD');
-      root.style.setProperty('--color-secondary', '#F8F9FA');
-      root.style.setProperty('--color-accent', '#E9ECEF');
+      // Light theme colors
       root.style.setProperty('--color-background', '#FFFFFF');
       root.style.setProperty('--color-surface', '#F8F9FA');
+      root.style.setProperty('--color-primary', '#E3F2FD');
+      root.style.setProperty('--color-secondary', '#E9ECEF');
+      root.style.setProperty('--color-accent', '#BBDEFB');
+      root.style.setProperty('--color-text-primary', '#000000');
+      root.style.setProperty('--color-text-secondary', '#4B5563');
     }
   }, [theme]);
 
