@@ -56,7 +56,7 @@ export default function Register() {
     <img
       src="/assets/logo.png"
       alt="Logo"
-      className="w-16 h-16 object-contain hover:scale-105 transition-transform duration-300"
+      className="w-36 h-36 object-contain hover:scale-125 transition-transform duration-300"
     />
   </div>
 
