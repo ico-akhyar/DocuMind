@@ -151,7 +151,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
                 type="checkbox"
                 id="isPermanent"
                 checked={isPermanent}
-                onChange={(e) => setIsPmanent(e.target.checked)}
+                onChange={(e) => setIsPermanent(e.target.checked)}
                 className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
               <label htmlFor="isPermanent" className="text-sm text-gray-700 dark:text-gray-300">
