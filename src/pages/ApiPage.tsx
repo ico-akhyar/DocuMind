@@ -113,6 +113,13 @@ const ApiPage: React.FC = () => {
     setTimeout(() => setCopiedEndpoint(null), 2000);
   };
 
+  const scrollToQuickStart = () => {
+    const quickStartSection = document.querySelector('section:nth-of-type(2)');
+    if (quickStartSection) {
+      quickStartSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
       <Header />
@@ -141,12 +148,14 @@ const ApiPage: React.FC = () => {
             >
               View Endpoints
             </a>
-            <Link
-    to="/register"
-    className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold rounded-xl transition-colors"
-  >
-    Get API Key
-  </Link>
+            <a
+              href="https://akhyar919-documind.hf.space/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 font-semibold rounded-xl transition-colors"
+            >
+              Get API Key
+            </a>
           </div>
         </div>
       </section>
@@ -367,12 +376,12 @@ const ApiPage: React.FC = () => {
                   ))}
                 </div>
                 
-                <Link
-  to="/register"
-  className="inline-flex items-center justify-center w-full py-3 bg-white text-green-600 rounded-xl font-bold hover:bg-gray-100 transition-colors"
->
-  {freePlan.cta}
-</Link>
+                <button
+                  onClick={scrollToQuickStart}
+                  className="inline-flex items-center justify-center w-full py-3 bg-white text-green-600 rounded-xl font-bold hover:bg-gray-100 transition-colors"
+                >
+                  {freePlan.cta}
+                </button>
               </div>
             </div>
           </div>
