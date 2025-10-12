@@ -41,7 +41,7 @@ export default function Header() {
     <img 
       src="/assets/logo.png" 
       alt="Logo" 
-      className="w-10 h-10 object-contain group-hover:scale-105 transition-transform duration-300"
+      className="w-16 h-16 object-contain group-hover:scale-105 transition-transform duration-300"
     />
     <div className="flex flex-col">
       <h1 className="text-xl font-bold text-gray-900 dark:text-white">
