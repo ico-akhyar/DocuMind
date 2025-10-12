@@ -76,8 +76,8 @@ export default function Header() {
             </nav>
 
             <div className="flex items-center space-x-3">
-              {/* Theme Toggle */}
-              <button
+              Theme Toggle
+              {/* <button
                 onClick={toggleTheme}
                 className="p-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all duration-200"
                 aria-label="Toggle theme"
@@ -87,7 +87,7 @@ export default function Header() {
                 ) : (
                   <Sun className="h-5 w-5" />
                 )}
-              </button>
+              </button> */}
 
               {currentUser ? (
                 /* User Menu */
