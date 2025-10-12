@@ -49,9 +49,9 @@ export default function Header() {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   DocuMind
                 </h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
+                {/* <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
                   AI Document Assistant
-                </p>
+                </p> */}
               </div>
             </Link>
           </div>
