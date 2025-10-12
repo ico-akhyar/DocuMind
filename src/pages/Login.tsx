@@ -36,7 +36,7 @@ export default function Login() {
     <img
       src="/assets/logo.png"
       alt="Logo"
-      className="w-30 h-30 object-contain hover:scale-125 transition-transform duration-300"
+      className="w-36 h-36 object-contain hover:scale-125 transition-transform duration-300"
     />
   </div>
 
