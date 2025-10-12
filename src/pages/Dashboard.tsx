@@ -22,7 +22,7 @@ export default function Dashboard() {
             <img 
               src="/assets/logo.png" 
               alt="DocuMind Logo" 
-              className="w-24 h-24 object-contain"
+              className="w-48 h-48 object-contain"
             />
             <div>
               <h1 className="text-4xl font-bold text-white">
