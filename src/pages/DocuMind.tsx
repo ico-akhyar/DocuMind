@@ -489,18 +489,20 @@ const DocuMind: React.FC = () => {
     </p>
     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
       <Link
-        to="/api#endpoints"
+        to="/api"
         className="inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105"
       >
         <Code className="mr-3 h-6 w-6" />
         Explore API
       </Link>
-      <Link
-        to="/register"
-        className="inline-flex items-center justify-center px-8 py-4 border-2 border-white text-white font-bold rounded-xl hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105"
-      >
-        Start Building Now
-      </Link>
+      <a
+  href="https://oryvo.vercel.app/join-team/"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="inline-flex items-center justify-center px-8 py-4 border-2 border-white text-white font-bold rounded-xl hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105"
+>
+  Work With Us
+</a>
     </div>
   </div>
 </section>
