@@ -33,24 +33,24 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo and Brand */}
-          <div className="flex items-center space-x-3">
-            <Link 
-              to="/" 
-              className="flex items-center space-x-3 group"
-            >
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                <span className="text-white font-bold text-lg">DM</span>
-              </div>
-              <div className="flex flex-col">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                  DocuMind
-                </h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  AI Document Assistant
-                </p>
-              </div>
-            </Link>
-          </div>
+<div className="flex items-center space-x-3">
+  <Link 
+    to="/" 
+    className="flex items-center space-x-3 group"
+  >
+    <img 
+      src="/assets/logo.png" 
+      alt="Logo" 
+      className="w-10 h-10 object-contain group-hover:scale-105 transition-transform duration-300"
+    />
+    <div className="flex flex-col">
+      <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+        DocuMind
+      </h1>
+    </div>
+  </Link>
+</div>
+
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-8">

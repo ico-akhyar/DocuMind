@@ -51,20 +51,23 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-purple-50 dark:from-gray-900 dark:to-purple-900/20 px-4 pt-16">
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
-        <div className="text-center">
-          <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center group hover:scale-105 transition-transform duration-300">
-              <span className="text-white font-bold text-2xl">DM</span>
-            </div>
-          </div>
-          
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Create Account
-          </h2>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Join DocuMind and start analyzing your documents
-          </p>
-        </div>
+<div className="text-center">
+  <div className="flex justify-center mb-6">
+    <img
+      src="/assets/logo.png"
+      alt="Logo"
+      className="w-16 h-16 object-contain hover:scale-105 transition-transform duration-300"
+    />
+  </div>
+
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
+    Create Account
+  </h2>
+  <p className="mt-2 text-gray-600 dark:text-gray-400">
+    Join DocuMind and start analyzing your documents
+  </p>
+</div>
+
 
         {/* Registration Form */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-8 shadow-lg">
