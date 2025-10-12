@@ -16,19 +16,19 @@ export default function Dashboard() {
       <Header />
 
       {/* Dashboard Header Section */}
-      <div className="pt-24 pb-8 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-800 dark:to-blue-900/20">
+      <div className="pt-24 pb-8 bg-gradient-to-br from-gray-900 to-blue-900 dark:from-gray-800 dark:to-blue-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col items-center text-center space-y-4">
             <img 
               src="/assets/logo.png" 
               alt="DocuMind Logo" 
-              className="w-16 h-16 object-contain"
+              className="w-24 h-24 object-contain"
             />
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <h1 className="text-4xl font-bold text-white">
                 DocuMind
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
+              <p className="text-gray-300 mt-2 text-lg">
                 Your AI Document Assistant - Upload, Process, and Ask Questions
               </p>
             </div>
