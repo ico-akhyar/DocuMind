@@ -183,6 +183,12 @@ const DocuMind: React.FC = () => {
     }
   ];
 
+  const scrollToApiTop = () => {
+    // Navigate to API page first
+    window.location.href = '/api';
+    // The API page will automatically load at the top
+  };
+
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
       <Header />
@@ -479,33 +485,33 @@ const DocuMind: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-<section className="py-16 sm:py-20 lg:py-32 bg-gradient-to-br from-purple-900 via-blue-900 to-gray-900 text-white px-4 sm:px-6 lg:px-8">
-  <div className="max-w-4xl mx-auto text-center">
-    <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6">
-      Ready to Get Started?
-    </h2>
-    <p className="text-xl md:text-2xl mb-8 sm:mb-12 opacity-90">
-      Join developers worldwide using our free RAG API to build intelligent document applications.
-    </p>
-    <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
-      <Link
-        to="/api"
-        className="inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105"
-      >
-        <Code className="mr-3 h-6 w-6" />
-        Explore API
-      </Link>
-      <a
-  href="https://oryvo.vercel.app/join-team/"
-  target="_blank"
-  rel="noopener noreferrer"
-  className="inline-flex items-center justify-center px-8 py-4 border-2 border-white text-white font-bold rounded-xl hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105"
->
-  Work With Us
-</a>
-    </div>
-  </div>
-</section>
+      <section className="py-16 sm:py-20 lg:py-32 bg-gradient-to-br from-purple-900 via-blue-900 to-gray-900 text-white px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6">
+            Ready to Get Started?
+          </h2>
+          <p className="text-xl md:text-2xl mb-8 sm:mb-12 opacity-90">
+            Join developers worldwide using our free RAG API to build intelligent document applications.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
+            <button
+              onClick={scrollToApiTop}
+              className="inline-flex items-center justify-center px-8 py-4 bg-white text-gray-900 font-bold rounded-xl hover:bg-gray-100 transition-all duration-300 transform hover:scale-105"
+            >
+              <Code className="mr-3 h-6 w-6" />
+              Explore API
+            </button>
+            <a
+              href="https://oryvo.vercel.app/join-team/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-8 py-4 border-2 border-white text-white font-bold rounded-xl hover:bg-white hover:text-gray-900 transition-all duration-300 transform hover:scale-105"
+            >
+              Work With Us
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
