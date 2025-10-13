@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, FileText } from 'lucide-react';
 import { queryDocuments } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Message {
   id: string;
@@ -23,7 +24,9 @@ export default function ChatInterface() {
   const [loading, setLoading] = useState(false);
   const [queryMode, setQueryMode] = useState('Explain');
   const [sessionOnly, setSessionOnly] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { currentUser } = useAuth();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -32,6 +35,38 @@ export default function ChatInterface() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Generate or clear session ID based on sessionOnly mode
+  useEffect(() => {
+    if (sessionOnly && !currentSessionId) {
+      // Generate a unique session ID when session-only mode is enabled
+      const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentSessionId(newSessionId);
+      console.log('New session created:', newSessionId);
+      
+      // Add a system message to inform the user
+      const systemMessage: Message = {
+        id: `session_${Date.now()}`,
+        type: 'bot',
+        content: 'Session-only mode activated. I will only search through documents uploaded in this session.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, systemMessage]);
+    } else if (!sessionOnly && currentSessionId) {
+      // Clear session ID when not in session-only mode
+      console.log('Session-only mode deactivated. Clearing session:', currentSessionId);
+      setCurrentSessionId(undefined);
+      
+      // Add a system message to inform the user
+      const systemMessage: Message = {
+        id: `session_clear_${Date.now()}`,
+        type: 'bot',
+        content: 'Session-only mode deactivated. I will now search through all your documents.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, systemMessage]);
+    }
+  }, [sessionOnly, currentSessionId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +84,13 @@ export default function ChatInterface() {
     setLoading(true);
 
     try {
-      const response = await queryDocuments(input, undefined, sessionOnly, queryMode);
+      // FIXED: Pass the currentSessionId when sessionOnly is true
+      const response = await queryDocuments(
+        input, 
+        sessionOnly ? currentSessionId : undefined, // Only pass sessionId when sessionOnly is true
+        sessionOnly, // session_only parameter
+        queryMode
+      );
 
       const botMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -108,6 +149,15 @@ export default function ChatInterface() {
             </label>
           </div>
         </div>
+
+        {/* Session status indicator */}
+        {sessionOnly && currentSessionId && (
+          <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-xs text-blue-600 dark:text-blue-400 text-center">
+              🔍 Session-only mode active. Only searching session documents.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -121,6 +171,13 @@ export default function ChatInterface() {
               <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
                 I'll search through your uploaded files to find answers
               </p>
+              {sessionOnly && (
+                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400">
+                    <strong>Session-only mode:</strong> I will only search through documents uploaded during this session.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -140,6 +197,11 @@ export default function ChatInterface() {
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
               </div>
+              {sessionOnly && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Searching in session documents only...
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -153,7 +215,11 @@ export default function ChatInterface() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a question about your documents..."
+            placeholder={
+              sessionOnly 
+                ? "Ask a question about your session documents..." 
+                : "Ask a question about your documents..."
+            }
             disabled={loading}
             className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 disabled:opacity-50 transition-colors"
           />
@@ -165,6 +231,14 @@ export default function ChatInterface() {
             <Send className="h-5 w-5" />
           </button>
         </div>
+        
+        {sessionOnly && (
+          <div className="mt-2 flex items-center justify-center">
+            <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+              🔍 Session-only search active
+            </span>
+          </div>
+        )}
       </form>
     </div>
   );
