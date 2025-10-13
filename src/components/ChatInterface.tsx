@@ -12,6 +12,7 @@ interface Message {
     page: number;
     chunk_id: number;
     content_preview: string;
+    full_content?: string; // ADDED: For RAGAS evaluation
     similarity_score: number;
     document_type: string;
   }>;
@@ -287,6 +288,20 @@ function MessageBubble({ message }: { message: Message }) {
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
                         {source.content_preview}
                       </p>
+
+                      {/* ADDED: Hidden debug element with full chunk content for RAGAS evaluation */}
+                      <div 
+                        className="hidden rag-debug-context" 
+                        data-filename={source.filename}
+                        data-page={source.page}
+                        data-chunk-id={source.chunk_id}
+                        data-similarity={source.similarity_score}
+                        data-document-type={source.document_type}
+                      >
+                        {source.full_content || source.content_preview}
+                      </div>
+
+                      {process.env.NODE_ENV === 'development' && console.log('Full chunk:', source.full_content || source.content_preview)}
                     </div>
                   </div>
                 </div>
