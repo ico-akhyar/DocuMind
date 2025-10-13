@@ -64,18 +64,29 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     setError('');
 
     try {
+      console.log('📤 Uploading file with isPermanent:', isPermanent);
       await uploadDocument(selectedFile, isPermanent);
       setSelectedFile(null);
       
-      // ADDED: Call the success callback to refresh document list
+      // Reset to default state after upload
+      setIsPermanent(true);
+      
       onUploadSuccess();
       
-      // ADDED: Reset file input
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Upload failed');
+      console.error('Upload error:', err);
+      setError(err.response?.data?.detail || err.message || 'Upload failed');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const removeSelectedFile = () => {
+    setSelectedFile(null);
+    setError('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -128,6 +139,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
           </div>
         ) : (
           <div className="space-y-4">
+            {/* File Preview */}
             <div className="flex items-center justify-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
               <File className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               <div className="flex-1 text-left">
@@ -139,32 +151,75 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
                 </p>
               </div>
               <button
-                onClick={() => setSelectedFile(null)}
+                onClick={removeSelectedFile}
                 className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                disabled={uploading}
               >
                 <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
 
-            <div className="flex items-center justify-center gap-2">
-              <input
-                type="checkbox"
-                id="isPermanent"
-                checked={isPermanent}
-                onChange={(e) => setIsPermanent(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-              />
-              <label htmlFor="isPermanent" className="text-sm text-gray-700 dark:text-gray-300">
-                Save as permanent document
+            {/* Document Type Selection */}
+            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Document Type:
               </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer flex-1">
+                  <input
+                    type="radio"
+                    name="documentType"
+                    checked={isPermanent}
+                    onChange={() => setIsPermanent(true)}
+                    className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    disabled={uploading}
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium text-gray-900 dark:text-white">Permanent</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Stored for 14 days, searchable in all sessions
+                    </p>
+                  </div>
+                </label>
+                
+                <label className="flex items-center gap-2 cursor-pointer flex-1">
+                  <input
+                    type="radio"
+                    name="documentType"
+                    checked={!isPermanent}
+                    onChange={() => setIsPermanent(false)}
+                    className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                    disabled={uploading}
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium text-gray-900 dark:text-white">Session Only</span>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Temporary (30 min), only in current session
+                    </p>
+                  </div>
+                </label>
+              </div>
+              
+              {/* Debug Info */}
+              <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-600 dark:text-blue-400">
+                📝 Will upload as: <strong>{isPermanent ? 'PERMANENT' : 'SESSION'}</strong>
+              </div>
             </div>
 
+            {/* Upload Button */}
             <button
               onClick={handleUpload}
               disabled={uploading}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 disabled:transform-none"
             >
-              {uploading ? 'Uploading...' : 'Upload Document'}
+              {uploading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Uploading...
+                </div>
+              ) : (
+                `Upload as ${isPermanent ? 'Permanent' : 'Session'} Document`
+              )}
             </button>
           </div>
         )}
@@ -173,6 +228,15 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       {error && (
         <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Upload Status */}
+      {uploading && (
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-sm text-blue-600 dark:text-blue-400 text-center">
+            ⏳ Uploading and processing document... This may take a moment.
+          </p>
         </div>
       )}
     </div>
