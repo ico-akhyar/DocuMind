@@ -59,20 +59,20 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
 
   const handleUpload = async () => {
     if (!selectedFile) return;
-  
+
     setUploading(true);
     setError('');
-  
+
     try {
       console.log('📤 Uploading file with isPermanent:', isPermanent);
       console.log('📤 File will be uploaded as:', isPermanent ? 'PERMANENT' : 'SESSION');
       
-      await uploadDocument(selectedFile, isPermanent);
+      // FIXED: Explicitly pass the isPermanent value
+      const response = await uploadDocument(selectedFile, isPermanent);
+      
+      console.log('✅ Upload response:', response.data);
+      
       setSelectedFile(null);
-      
-      // Reset to default state after upload
-      setIsPermanent(true);
-      
       onUploadSuccess();
       
       if (fileInputRef.current) fileInputRef.current.value = '';
