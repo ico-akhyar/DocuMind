@@ -35,9 +35,10 @@ api.interceptors.request.use(async (config) => {
 export const uploadDocument = async (file: File, isPermanent: boolean = true) => {
   const formData = new FormData();
   formData.append('file', file);
-  // NOTE: The backend expects a boolean, but FormData converts it to a string.
-  // The Python backend correctly handles "true" and "false" strings.
-  formData.append('is_permanent', String(isPermanent));
+  // FIXED: Send as proper string boolean that FastAPI can parse
+  formData.append('is_permanent', isPermanent.toString());
+
+  console.log('🔄 API call - is_permanent:', isPermanent.toString());
 
   return api.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
