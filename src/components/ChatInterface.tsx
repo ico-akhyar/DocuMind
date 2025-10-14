@@ -12,20 +12,24 @@ interface Message {
     page: number;
     chunk_id: number;
     content_preview: string;
-    full_content?: string; // ADDED: For RAGAS evaluation
+    full_content?: string;
     similarity_score: number;
     document_type: string;
   }>;
   timestamp: Date;
 }
 
-export default function ChatInterface() {
+interface ChatInterfaceProps {
+  currentSessionId?: string;
+  onSessionCleared?: () => void;
+}
+
+export default function ChatInterface({ currentSessionId, onSessionCleared }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [queryMode, setQueryMode] = useState('Explain');
   const [sessionOnly, setSessionOnly] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useAuth();
 
@@ -37,37 +41,13 @@ export default function ChatInterface() {
     scrollToBottom();
   }, [messages]);
 
-  // Generate or clear session ID based on sessionOnly mode
+  // When we get a session ID from uploads, auto-enable session mode
   useEffect(() => {
-    if (sessionOnly && !currentSessionId) {
-      // Generate a unique session ID when session-only mode is enabled
-      const newSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      setCurrentSessionId(newSessionId);
-      console.log('New session created:', newSessionId);
-      
-      // Add a system message to inform the user
-      const systemMessage: Message = {
-        id: `session_${Date.now()}`,
-        type: 'bot',
-        content: 'Session-only mode activated. I will only search through documents uploaded in this session.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, systemMessage]);
-    } else if (!sessionOnly && currentSessionId) {
-      // Clear session ID when not in session-only mode
-      console.log('Session-only mode deactivated. Clearing session:', currentSessionId);
-      setCurrentSessionId(undefined);
-      
-      // Add a system message to inform the user
-      const systemMessage: Message = {
-        id: `session_clear_${Date.now()}`,
-        type: 'bot',
-        content: 'Session-only mode deactivated. I will now search through all your documents.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, systemMessage]);
+    if (currentSessionId && !sessionOnly) {
+      console.log('Auto-enabling session mode for session:', currentSessionId);
+      setSessionOnly(true);
     }
-  }, [sessionOnly, currentSessionId]);
+  }, [currentSessionId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,11 +71,11 @@ export default function ChatInterface() {
         queryMode
       });
 
-      // FIXED: Pass the currentSessionId when we have session documents
+      // Use the backend-generated session ID, not frontend-generated
       const response = await queryDocuments(
         input, 
-        currentSessionId, // Pass the session ID if we have one
-        sessionOnly, // session_only parameter
+        currentSessionId, // Use the actual session ID from backend
+        sessionOnly, 
         queryMode
       );
 
@@ -119,6 +99,33 @@ export default function ChatInterface() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSessionToggle = (newSessionOnly: boolean) => {
+    setSessionOnly(newSessionOnly);
+    
+    if (!newSessionOnly && onSessionCleared) {
+      console.log('Session mode disabled, clearing session');
+      onSessionCleared();
+      
+      // Add system message
+      const systemMessage: Message = {
+        id: `session_clear_${Date.now()}`,
+        type: 'bot',
+        content: 'Session mode deactivated. I will now search through all your permanent documents.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, systemMessage]);
+    } else if (newSessionOnly && currentSessionId) {
+      // Add system message when session mode is enabled
+      const systemMessage: Message = {
+        id: `session_active_${Date.now()}`,
+        type: 'bot',
+        content: 'Session mode activated. I will only search through documents uploaded in this session.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, systemMessage]);
     }
   };
 
@@ -148,10 +155,11 @@ export default function ChatInterface() {
               <input
                 type="checkbox"
                 checked={sessionOnly}
-                onChange={(e) => setSessionOnly(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                onChange={(e) => handleSessionToggle(e.target.checked)}
+                disabled={!currentSessionId}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <span className={`text-sm font-medium ${currentSessionId ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'}`}>
                 Session Only
               </span>
             </label>
@@ -170,6 +178,14 @@ export default function ChatInterface() {
             </p>
             <p className="text-xs text-blue-500 dark:text-blue-300 text-center mt-1">
               Session ID: {currentSessionId}
+            </p>
+          </div>
+        )}
+
+        {!currentSessionId && sessionOnly && (
+          <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-xs text-yellow-700 dark:text-yellow-400 text-center">
+              ⚠️ No active session. Upload a session document first to use session-only mode.
             </p>
           </div>
         )}
@@ -246,7 +262,7 @@ export default function ChatInterface() {
           />
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={loading || !input.trim() || (sessionOnly && !currentSessionId)}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 disabled:transform-none"
           >
             <Send className="h-5 w-5" />
@@ -257,6 +273,14 @@ export default function ChatInterface() {
           <div className="mt-2 flex items-center justify-center">
             <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
               {sessionOnly ? '🔍 Session-only search' : '📚 Hybrid search (Permanent + Session)'}
+            </span>
+          </div>
+        )}
+
+        {sessionOnly && !currentSessionId && (
+          <div className="mt-2 flex items-center justify-center">
+            <span className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">
+              ⚠️ Upload a session document first
             </span>
           </div>
         )}
@@ -308,20 +332,6 @@ function MessageBubble({ message }: { message: Message }) {
                       <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
                         {source.content_preview}
                       </p>
-
-                      {/* ADDED: Hidden debug element with full chunk content for RAGAS evaluation */}
-                      <div 
-                        className="hidden rag-debug-context" 
-                        data-filename={source.filename}
-                        data-page={source.page}
-                        data-chunk-id={source.chunk_id}
-                        data-similarity={source.similarity_score}
-                        data-document-type={source.document_type}
-                      >
-                        {source.full_content || source.content_preview}
-                      </div>
-
-                      {process.env.NODE_ENV === 'development' && console.log('Full chunk:', source.full_content || source.content_preview)}
                     </div>
                   </div>
                 </div>

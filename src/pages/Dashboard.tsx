@@ -13,8 +13,13 @@ export default function Dashboard() {
   };
 
   const handleSessionCreated = (sessionId: string) => {
-    console.log('Dashboard: Session created:', sessionId);
+    console.log('Dashboard: Session created by upload:', sessionId);
     setCurrentSessionId(sessionId);
+  };
+
+  const handleSessionCleared = () => {
+    console.log('Dashboard: Session cleared');
+    setCurrentSessionId(undefined);
   };
 
   return (
@@ -54,7 +59,10 @@ export default function Dashboard() {
           </div>
 
           <div className="lg:col-span-2">
-            <ChatInterface currentSessionId={currentSessionId} />
+            <ChatInterface 
+              currentSessionId={currentSessionId}
+              onSessionCleared={handleSessionCleared}
+            />
           </div>
         </div>
       </main>
