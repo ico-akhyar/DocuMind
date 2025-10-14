@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, FileText } from 'lucide-react';
+import { Send, Bot, User, FileText, Trash2 } from 'lucide-react';
 import { queryDocuments } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,7 +12,7 @@ interface Message {
     page: number;
     chunk_id: number;
     content_preview: string;
-    full_content?: string;  // Add this
+    full_content?: string;
     similarity_score: number;
     document_type: string;
   }>;
@@ -49,120 +49,125 @@ export default function ChatInterface({ currentSessionId, onSessionCleared }: Ch
     }
   }, [currentSessionId]);
 
-  // In ChatInterface.tsx, update the handleSubmit function:
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || loading) return;
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!input.trim() || loading) return;
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: input,
+      timestamp: new Date(),
+    };
 
-  const userMessage: Message = {
-    id: Date.now().toString(),
-    type: 'user',
-    content: input,
-    timestamp: new Date(),
-  };
+    setMessages((prev) => [...prev, userMessage]);
+    setInput('');
+    setLoading(true);
 
-  setMessages((prev) => [...prev, userMessage]);
-  setInput('');
-  setLoading(true);
-
-  try {
-    console.log('🔍 Querying with session:', {
-      sessionId: currentSessionId,
-      sessionOnly,
-      queryMode
-    });
-
-    // Use the backend-generated session ID, not frontend-generated
-    const response = await queryDocuments(
-      input, 
-      currentSessionId, // Use the actual session ID from backend
-      sessionOnly, 
-      queryMode
-    );
-
-    // NEW: Log retrieved chunks to browser console for evaluation
-    console.log('📋 RAG RETRIEVED CHUNKS FOR EVALUATION', {
-      query: input,
-      sessionId: currentSessionId,
-      sessionOnly,
-      queryMode,
-      totalChunks: response.data.sources?.length || 0,
-      chunks: response.data.sources?.map((source, index) => ({
-        chunkIndex: index + 1,
-        filename: source.filename,
-        page: source.page,
-        chunkId: source.chunk_id,
-        documentType: source.document_type,
-        similarityScore: source.similarity_score,
-        contentPreview: source.content_preview,
-        fullContent: source.full_content, // This contains the full chunk text
-        textLength: source.full_content?.length || 0
-      })) || []
-    });
-
-    // Also log individual chunks for easier inspection
-    if (response.data.sources && response.data.sources.length > 0) {
-      console.log('🔍 INDIVIDUAL CHUNK DETAILS:');
-      response.data.sources.forEach((source, index) => {
-        console.log(`--- CHUNK ${index + 1} ---`);
-        console.log(`Filename: ${source.filename}`);
-        console.log(`Page: ${source.page}`);
-        console.log(`Document Type: ${source.document_type}`);
-        console.log(`Similarity: ${source.similarity_score}`);
-        console.log(`Text Length: ${source.full_content?.length || 0} chars`);
-        console.log('Full Text:', source.full_content);
-        console.log('-------------------');
+    try {
+      console.log('🔍 Querying with session:', {
+        sessionId: currentSessionId,
+        sessionOnly,
+        queryMode
       });
+
+      // Use the backend-generated session ID, not frontend-generated
+      const response = await queryDocuments(
+        input, 
+        currentSessionId, // Use the actual session ID from backend
+        sessionOnly, 
+        queryMode
+      );
+
+      // NEW: Log retrieved chunks to browser console for evaluation
+      console.log('📋 RAG RETRIEVED CHUNKS FOR EVALUATION', {
+        query: input,
+        sessionId: currentSessionId,
+        sessionOnly,
+        queryMode,
+        totalChunks: response.data.sources?.length || 0,
+        chunks: response.data.sources?.map((source, index) => ({
+          chunkIndex: index + 1,
+          filename: source.filename,
+          page: source.page,
+          chunkId: source.chunk_id,
+          documentType: source.document_type,
+          similarityScore: source.similarity_score,
+          contentPreview: source.content_preview,
+          fullContent: source.full_content, // This contains the full chunk text
+          textLength: source.full_content?.length || 0
+        })) || []
+      });
+
+      // Also log individual chunks for easier inspection
+      if (response.data.sources && response.data.sources.length > 0) {
+        console.log('🔍 INDIVIDUAL CHUNK DETAILS:');
+        response.data.sources.forEach((source, index) => {
+          console.log(`\n--- CHUNK ${index + 1} ---`);
+          console.log(`Filename: ${source.filename}`);
+          console.log(`Page: ${source.page}`);
+          console.log(`Document Type: ${source.document_type}`);
+          console.log(`Similarity: ${source.similarity_score}`);
+          console.log(`Text Length: ${source.full_content?.length || 0} chars`);
+          console.log('Full Text:', source.full_content);
+          console.log('-------------------\n');
+        });
+      } else {
+        console.log('❌ No chunks retrieved for this query');
+      }
+
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'bot',
+        content: response.data.answer,
+        sources: response.data.sources,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, botMessage]);
+    } catch (err: any) {
+      console.error('Query error:', err);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        type: 'bot',
+        content: err.response?.data?.detail || 'Failed to get response. Please try again.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
     }
-
-    const botMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      type: 'bot',
-      content: response.data.answer,
-      sources: response.data.sources,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, botMessage]);
-  } catch (err: any) {
-    console.error('Query error:', err);
-    const errorMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      type: 'bot',
-      content: err.response?.data?.detail || 'Failed to get response. Please try again.',
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, errorMessage]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleSessionToggle = (newSessionOnly: boolean) => {
     setSessionOnly(newSessionOnly);
     
-    if (!newSessionOnly && onSessionCleared) {
-      console.log('Session mode disabled, clearing session');
+    // Add system message based on the new mode
+    const systemMessage: Message = {
+      id: `session_mode_${Date.now()}`,
+      type: 'bot',
+      content: newSessionOnly 
+        ? 'Session-only mode activated. I will only search through documents uploaded in this session.'
+        : 'Hybrid mode activated. I will search through both permanent documents and session documents.',
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, systemMessage]);
+    
+    // REMOVED: Don't clear the session when toggling off session-only mode
+    // The session should persist and be available for future toggles
+  };
+
+  const handleClearSession = () => {
+    if (onSessionCleared) {
       onSessionCleared();
-      
-      // Add system message
       const systemMessage: Message = {
-        id: `session_clear_${Date.now()}`,
+        id: `session_cleared_${Date.now()}`,
         type: 'bot',
-        content: 'Session mode deactivated. I will now search through all your permanent documents.',
+        content: 'Session cleared. All session documents have been removed.',
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, systemMessage]);
-    } else if (newSessionOnly && currentSessionId) {
-      // Add system message when session mode is enabled
-      const systemMessage: Message = {
-        id: `session_active_${Date.now()}`,
-        type: 'bot',
-        content: 'Session mode activated. I will only search through documents uploaded in this session.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, systemMessage]);
+      setSessionOnly(false); // Also disable session-only mode when clearing
     }
   };
 
@@ -216,6 +221,16 @@ const handleSubmit = async (e: React.FormEvent) => {
             <p className="text-xs text-blue-500 dark:text-blue-300 text-center mt-1">
               Session ID: {currentSessionId}
             </p>
+            {/* Add a clear session button */}
+            <div className="flex justify-center mt-2">
+              <button
+                onClick={handleClearSession}
+                className="flex items-center gap-1 text-xs px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+              >
+                <Trash2 className="h-3 w-3" />
+                Clear Session
+              </button>
+            </div>
           </div>
         )}
 
