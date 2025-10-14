@@ -12,7 +12,7 @@ interface Message {
     page: number;
     chunk_id: number;
     content_preview: string;
-    full_content?: string;
+    full_content?: string;  // Add this
     similarity_score: number;
     document_type: string;
   }>;
@@ -49,58 +49,95 @@ export default function ChatInterface({ currentSessionId, onSessionCleared }: Ch
     }
   }, [currentSessionId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || loading) return;
+  // In ChatInterface.tsx, update the handleSubmit function:
 
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      type: 'user',
-      content: input,
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!input.trim() || loading) return;
+
+  const userMessage: Message = {
+    id: Date.now().toString(),
+    type: 'user',
+    content: input,
+    timestamp: new Date(),
+  };
+
+  setMessages((prev) => [...prev, userMessage]);
+  setInput('');
+  setLoading(true);
+
+  try {
+    console.log('🔍 Querying with session:', {
+      sessionId: currentSessionId,
+      sessionOnly,
+      queryMode
+    });
+
+    // Use the backend-generated session ID, not frontend-generated
+    const response = await queryDocuments(
+      input, 
+      currentSessionId, // Use the actual session ID from backend
+      sessionOnly, 
+      queryMode
+    );
+
+    // NEW: Log retrieved chunks to browser console for evaluation
+    console.log('📋 RAG RETRIEVED CHUNKS FOR EVALUATION', {
+      query: input,
+      sessionId: currentSessionId,
+      sessionOnly,
+      queryMode,
+      totalChunks: response.data.sources?.length || 0,
+      chunks: response.data.sources?.map((source, index) => ({
+        chunkIndex: index + 1,
+        filename: source.filename,
+        page: source.page,
+        chunkId: source.chunk_id,
+        documentType: source.document_type,
+        similarityScore: source.similarity_score,
+        contentPreview: source.content_preview,
+        fullContent: source.full_content, // This contains the full chunk text
+        textLength: source.full_content?.length || 0
+      })) || []
+    });
+
+    // Also log individual chunks for easier inspection
+    if (response.data.sources && response.data.sources.length > 0) {
+      console.log('🔍 INDIVIDUAL CHUNK DETAILS:');
+      response.data.sources.forEach((source, index) => {
+        console.log(`--- CHUNK ${index + 1} ---`);
+        console.log(`Filename: ${source.filename}`);
+        console.log(`Page: ${source.page}`);
+        console.log(`Document Type: ${source.document_type}`);
+        console.log(`Similarity: ${source.similarity_score}`);
+        console.log(`Text Length: ${source.full_content?.length || 0} chars`);
+        console.log('Full Text:', source.full_content);
+        console.log('-------------------');
+      });
+    }
+
+    const botMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'bot',
+      content: response.data.answer,
+      sources: response.data.sources,
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setInput('');
-    setLoading(true);
-
-    try {
-      console.log('🔍 Querying with session:', {
-        sessionId: currentSessionId,
-        sessionOnly,
-        queryMode
-      });
-
-      // Use the backend-generated session ID, not frontend-generated
-      const response = await queryDocuments(
-        input, 
-        currentSessionId, // Use the actual session ID from backend
-        sessionOnly, 
-        queryMode
-      );
-
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'bot',
-        content: response.data.answer,
-        sources: response.data.sources,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, botMessage]);
-    } catch (err: any) {
-      console.error('Query error:', err);
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'bot',
-        content: err.response?.data?.detail || 'Failed to get response. Please try again.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setMessages((prev) => [...prev, botMessage]);
+  } catch (err: any) {
+    console.error('Query error:', err);
+    const errorMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      type: 'bot',
+      content: err.response?.data?.detail || 'Failed to get response. Please try again.',
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, errorMessage]);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSessionToggle = (newSessionOnly: boolean) => {
     setSessionOnly(newSessionOnly);
