@@ -85,10 +85,16 @@ export default function ChatInterface() {
     setLoading(true);
 
     try {
-      // FIXED: Pass the currentSessionId when sessionOnly is true
+      console.log('🔍 Querying with session:', {
+        sessionId: currentSessionId,
+        sessionOnly,
+        queryMode
+      });
+
+      // FIXED: Pass the currentSessionId when we have session documents
       const response = await queryDocuments(
         input, 
-        sessionOnly ? currentSessionId : undefined, // Only pass sessionId when sessionOnly is true
+        currentSessionId, // Pass the session ID if we have one
         sessionOnly, // session_only parameter
         queryMode
       );
@@ -103,6 +109,7 @@ export default function ChatInterface() {
 
       setMessages((prev) => [...prev, botMessage]);
     } catch (err: any) {
+      console.error('Query error:', err);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'bot',
@@ -152,10 +159,17 @@ export default function ChatInterface() {
         </div>
 
         {/* Session status indicator */}
-        {sessionOnly && currentSessionId && (
+        {currentSessionId && (
           <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-xs text-blue-600 dark:text-blue-400 text-center">
-              🔍 Session-only mode active. Only searching session documents.
+              {sessionOnly ? (
+                <>🔍 Session-only mode active. Only searching session documents.</>
+              ) : (
+                <>📚 Hybrid mode active. Searching both permanent and session documents.</>
+              )}
+            </p>
+            <p className="text-xs text-blue-500 dark:text-blue-300 text-center mt-1">
+              Session ID: {currentSessionId}
             </p>
           </div>
         )}
@@ -172,10 +186,12 @@ export default function ChatInterface() {
               <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
                 I'll search through your uploaded files to find answers
               </p>
-              {sessionOnly && (
+              {currentSessionId && (
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                    <strong>Session-only mode:</strong> I will only search through documents uploaded during this session.
+                    <strong>Session Active:</strong> {sessionOnly ? 
+                      "I will only search through documents uploaded during this session." : 
+                      "I will search through both permanent documents and session documents."}
                   </p>
                 </div>
               )}
@@ -198,9 +214,11 @@ export default function ChatInterface() {
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
               </div>
-              {sessionOnly && (
+              {currentSessionId && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  Searching in session documents only...
+                  {sessionOnly ? 
+                    "Searching in session documents only..." : 
+                    "Searching in both permanent and session documents..."}
                 </p>
               )}
             </div>
@@ -217,8 +235,10 @@ export default function ChatInterface() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={
-              sessionOnly 
+              sessionOnly && currentSessionId
                 ? "Ask a question about your session documents..." 
+                : currentSessionId
+                ? "Ask a question about all your documents..."
                 : "Ask a question about your documents..."
             }
             disabled={loading}
@@ -233,10 +253,10 @@ export default function ChatInterface() {
           </button>
         </div>
         
-        {sessionOnly && (
+        {currentSessionId && (
           <div className="mt-2 flex items-center justify-center">
             <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
-              🔍 Session-only search active
+              {sessionOnly ? '🔍 Session-only search' : '📚 Hybrid search (Permanent + Session)'}
             </span>
           </div>
         )}

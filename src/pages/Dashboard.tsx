@@ -6,9 +6,15 @@ import ChatInterface from '../components/ChatInterface';
 
 export default function Dashboard() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
 
   const handleUploadSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const handleSessionCreated = (sessionId: string) => {
+    console.log('Dashboard: Session created:', sessionId);
+    setCurrentSessionId(sessionId);
   };
 
   return (
@@ -39,12 +45,16 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 space-y-6">
-            <FileUpload onUploadSuccess={handleUploadSuccess} />
+            <FileUpload 
+              onUploadSuccess={handleUploadSuccess} 
+              currentSessionId={currentSessionId}
+              onSessionCreated={handleSessionCreated}
+            />
             <DocumentList refreshTrigger={refreshTrigger} />
           </div>
 
           <div className="lg:col-span-2">
-            <ChatInterface />
+            <ChatInterface currentSessionId={currentSessionId} />
           </div>
         </div>
       </main>

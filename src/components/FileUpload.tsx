@@ -4,9 +4,11 @@ import { uploadDocument } from '../services/api';
 
 interface FileUploadProps {
   onUploadSuccess: () => void;
+  currentSessionId?: string;
+  onSessionCreated?: (sessionId: string) => void;
 }
 
-export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
+export default function FileUpload({ onUploadSuccess, currentSessionId, onSessionCreated }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -67,10 +69,14 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       console.log('📤 Uploading file with isPermanent:', isPermanent);
       console.log('📤 File will be uploaded as:', isPermanent ? 'PERMANENT' : 'SESSION');
       
-      // FIXED: Explicitly pass the isPermanent value
       const response = await uploadDocument(selectedFile, isPermanent);
       
       console.log('✅ Upload response:', response.data);
+      
+      // If this is a session upload and we got a session ID, notify parent
+      if (!isPermanent && response.data.session_id && onSessionCreated) {
+        onSessionCreated(response.data.session_id);
+      }
       
       setSelectedFile(null);
       onUploadSuccess();
@@ -205,6 +211,9 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
               {/* Debug Info */}
               <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-600 dark:text-blue-400">
                 📝 Will upload as: <strong>{isPermanent ? 'PERMANENT' : 'SESSION'}</strong>
+                {currentSessionId && !isPermanent && (
+                  <div>Using existing session: {currentSessionId}</div>
+                )}
               </div>
             </div>
 
