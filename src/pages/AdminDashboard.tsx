@@ -31,8 +31,8 @@ interface SystemStats {
     systemUptime: string;
     memoryUsage: number;
     cpuUsage: number;
-    storageUsage: number; // ADD THIS
-    requestsPerMinute: number; // ADD THIS
+    storageUsage: number;
+    requestsPerMinute: number;
   }
 
 interface User {
@@ -75,6 +75,10 @@ const AdminDashboard: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [error, setError] = useState<string>('');
+
+  // API base URL - update this to match your backend
+  const API_BASE_URL = 'https://akhyar919-documind.hf.space';
 
   // Check if user is admin
   useEffect(() => {
@@ -86,13 +90,14 @@ const AdminDashboard: React.FC = () => {
           return;
         }
 
-        const response = await fetch('/api/admin/verify', {
+        const response = await fetch(`${API_BASE_URL}/admin/verify`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
 
         if (!response.ok) {
+          console.error('Admin verification failed:', response.status);
           navigate('/documind');
           return;
         }
@@ -107,56 +112,65 @@ const AdminDashboard: React.FC = () => {
     checkAdminAccess();
   }, [navigate]);
 
-  // In the loadDashboardData function, update the fetch URLs:
-const loadDashboardData = async () => {
+  const loadDashboardData = async () => {
     try {
       setLoading(true);
+      setError('');
       const token = localStorage.getItem('firebaseToken');
       
       if (!token) {
         navigate('/login');
         return;
       }
-  
+
       // Verify admin access first
-      const verifyResponse = await fetch('/api/admin/verify', {
+      const verifyResponse = await fetch(`${API_BASE_URL}/admin/verify`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-  
+
       if (!verifyResponse.ok) {
+        console.error('Admin verification failed:', verifyResponse.status);
         navigate('/documind');
         return;
       }
-  
-      // Fetch all data in parallel - UPDATE THESE ENDPOINTS
+
+      // Fetch all data in parallel
       const [statsResponse, usersResponse, sessionsResponse, docsResponse] = await Promise.all([
-        fetch('/api/admin/stats', {
+        fetch(`${API_BASE_URL}/admin/stats`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch('/api/admin/users', {
+        fetch(`${API_BASE_URL}/admin/users`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch('/api/admin/sessions', {
+        fetch(`${API_BASE_URL}/admin/sessions`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch('/api/admin/documents', {
+        fetch(`${API_BASE_URL}/admin/documents`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ]);
-  
-      if (!statsResponse.ok || !usersResponse.ok || !sessionsResponse.ok || !docsResponse.ok) {
-        throw new Error('Failed to fetch admin data');
+
+      // Check if responses are OK and content type is JSON
+      const responses = [statsResponse, usersResponse, sessionsResponse, docsResponse];
+      for (const response of responses) {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('Server returned non-JSON response');
+        }
       }
-  
+
       const [statsData, usersData, sessionsData, docsData] = await Promise.all([
         statsResponse.json(),
         usersResponse.json(),
         sessionsResponse.json(),
         docsResponse.json()
       ]);
-  
+
       setSystemStats(statsData);
       setUsers(usersData);
       setSessions(sessionsData);
@@ -164,8 +178,8 @@ const loadDashboardData = async () => {
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
-      alert('Failed to load admin data. Please check your permissions.');
-      navigate('/documind');
+      setError('Failed to load admin data. Please check if the server is running and accessible.');
+      // Don't navigate away, show error on page
     } finally {
       setLoading(false);
     }
@@ -195,6 +209,32 @@ const loadDashboardData = async () => {
         <div className="text-center">
           <RefreshCw className="h-12 w-12 text-blue-500 animate-spin mx-auto mb-4" />
           <p className="text-white text-lg">Loading Admin Dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Connection Error</h2>
+          <p className="text-gray-300 mb-4">{error}</p>
+          <div className="space-y-3">
+            <button
+              onClick={loadDashboardData}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => navigate('/documind')}
+              className="w-full bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
         </div>
       </div>
     );
