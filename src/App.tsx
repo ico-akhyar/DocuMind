@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import DocuMind from './pages/DocuMind';
 import ApiPage from './pages/ApiPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   return (
@@ -28,6 +29,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+  path="/admin"
+  element={
+    <ProtectedRoute>
+      <AdminDashboard />
+    </ProtectedRoute>
+  }
+/>
           </Routes>
         </BrowserRouter>
       </AuthProvider>
