@@ -110,45 +110,59 @@ const AdminDashboard: React.FC = () => {
       setLoading(true);
       const token = localStorage.getItem('firebaseToken');
       
-      // Fetch system stats
-      const statsResponse = await fetch('/api/admin/stats', {
+      if (!token) {
+        navigate('/login');
+        return;
+      }
+  
+      // Verify admin access first
+      const verifyResponse = await fetch('/api/admin/verify', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      const statsData = await statsResponse.json();
+  
+      if (!verifyResponse.ok) {
+        navigate('/documind');
+        return;
+      }
+  
+      // Fetch all data in parallel
+      const [statsResponse, usersResponse, sessionsResponse, docsResponse] = await Promise.all([
+        fetch('/api/admin/stats', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/admin/users', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/admin/sessions', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/admin/documents', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+  
+      if (!statsResponse.ok || !usersResponse.ok || !sessionsResponse.ok || !docsResponse.ok) {
+        throw new Error('Failed to fetch admin data');
+      }
+  
+      const [statsData, usersData, sessionsData, docsData] = await Promise.all([
+        statsResponse.json(),
+        usersResponse.json(),
+        sessionsResponse.json(),
+        docsResponse.json()
+      ]);
+  
       setSystemStats(statsData);
-
-      // Fetch users
-      const usersResponse = await fetch('/api/admin/users', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const usersData = await usersResponse.json();
       setUsers(usersData);
-
-      // Fetch sessions
-      const sessionsResponse = await fetch('/api/admin/sessions', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const sessionsData = await sessionsResponse.json();
       setSessions(sessionsData);
-
-      // Fetch documents
-      const docsResponse = await fetch('/api/admin/documents', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      const docsData = await docsResponse.json();
       setDocuments(docsData);
-
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
+      alert('Failed to load admin data. Please check your permissions.');
+      navigate('/documind');
     } finally {
       setLoading(false);
     }
