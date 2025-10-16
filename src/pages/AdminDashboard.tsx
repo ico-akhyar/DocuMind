@@ -2,22 +2,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Users, 
-  Clock, 
-  FileText, 
-  Cpu, 
-  Shield,
-  Activity,
-  LogOut,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Search,
-  Download,
-  MemoryStick,
-  HardDrive
-} from 'lucide-react';
+    Users, 
+    Database,  // ADD THIS IMPORT
+    Clock, 
+    FileText, 
+    Cpu, 
+    Shield,
+    Activity,
+    LogOut,
+    RefreshCw,
+    AlertTriangle,
+    CheckCircle,
+    XCircle,
+    Search,
+    Download,
+    MemoryStick,
+    HardDrive
+  } from 'lucide-react';
 
 interface SystemStats {
   totalUsers: number;
