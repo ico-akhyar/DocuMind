@@ -27,7 +27,7 @@ export default function Header() {
   const navItems = [
     { path: '/', label: 'Home', icon: <Home className="h-4 w-4" /> },
     { path: '/api', label: 'API', icon: <Code className="h-4 w-4" /> },
-    { path: '/dashboard', label: 'DocuMind', icon: <FileText className="h-4 w-4" /> },
+    { path: '/documind', label: 'DocuMind', icon: <FileText className="h-4 w-4" /> },
   ];
 
   return (

@@ -21,7 +21,7 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route
-              path="/dashboard"
+              path="/documind"
               element={
                 <ProtectedRoute>
                   <Dashboard />
