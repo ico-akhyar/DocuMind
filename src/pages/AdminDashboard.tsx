@@ -33,6 +33,7 @@ interface SystemStats {
     cpuUsage: number;
     storageUsage: number;
     requestsPerMinute: number;
+    totalStorageBytes?: number; // New optional field
   }
 
 interface User {
