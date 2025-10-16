@@ -3,14 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, 
-  Database, 
   Clock, 
   FileText, 
   Cpu, 
   Shield,
-  TrendingUp,
-  PieChart,
-  BarChart3,
   Activity,
   LogOut,
   RefreshCw,
@@ -18,23 +14,28 @@ import {
   CheckCircle,
   XCircle,
   Search,
-  Filter,
-  Download
+  Download,
+  MemoryStick,
+  HardDrive
 } from 'lucide-react';
 
 interface SystemStats {
-    totalUsers: number;
-    activeSessions: number;
-    totalDocuments: number;
-    totalChunks: number;
-    avgResponseTime: number;
-    systemUptime: string;
-    memoryUsage: number;
-    cpuUsage: number;
-    storageUsage: number;
-    requestsPerMinute: number;
-    totalStorageBytes?: number; // New optional field
-  }
+  totalUsers: number;
+  activeSessions: number;
+  totalDocuments: number;
+  totalChunks: number;
+  avgResponseTime: number;
+  systemUptime: string;
+  memoryUsage: number;
+  memoryUsedGB?: number;
+  memoryTotalGB?: number;
+  cpuUsage: number;
+  storageUsage: number;
+  storageUsedGB?: number;
+  storageTotalGB?: number;
+  requestsPerMinute: number;
+  totalStorageBytes?: number;
+}
 
 interface User {
   id: string;
@@ -194,16 +195,6 @@ const AdminDashboard: React.FC = () => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const formatTime = (seconds: number): string => {
-    const days = Math.floor(seconds / (24 * 60 * 60));
-    const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
-    const minutes = Math.floor((seconds % (60 * 60)) / 60);
-    
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -289,8 +280,7 @@ const AdminDashboard: React.FC = () => {
               { id: 'overview', name: 'Overview', icon: Activity },
               { id: 'users', name: 'Users', icon: Users },
               { id: 'sessions', name: 'Sessions', icon: Clock },
-              { id: 'documents', name: 'Documents', icon: FileText },
-              { id: 'performance', name: 'Performance', icon: TrendingUp }
+              { id: 'documents', name: 'Documents', icon: FileText }
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -316,6 +306,19 @@ const AdminDashboard: React.FC = () => {
         {/* Overview Tab */}
         {activeTab === 'overview' && systemStats && (
           <div className="space-y-6">
+            {/* High Memory Warning */}
+            {systemStats.memoryUsage > 85 && (
+              <div className="bg-red-900 border border-red-700 rounded-lg p-4">
+                <div className="flex items-center">
+                  <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
+                  <span className="font-bold text-red-200">High Memory Usage Warning</span>
+                </div>
+                <p className="text-red-300 text-sm mt-1">
+                  Memory usage is critically high ({systemStats.memoryUsage}%). Consider restarting the space.
+                </p>
+              </div>
+            )}
+
             {/* System Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-gray-800 rounded-xl p-6 border-l-4 border-blue-500">
@@ -351,23 +354,27 @@ const AdminDashboard: React.FC = () => {
               <div className="bg-gray-800 rounded-xl p-6 border-l-4 border-yellow-500">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-400 text-sm">Avg Response Time</p>
-                    <p className="text-3xl font-bold mt-2">{systemStats.avgResponseTime}ms</p>
+                    <p className="text-gray-400 text-sm">Total Chunks</p>
+                    <p className="text-3xl font-bold mt-2">{systemStats.totalChunks.toLocaleString()}</p>
                   </div>
-                  <Cpu className="h-8 w-8 text-yellow-500" />
+                  <Database className="h-8 w-8 text-yellow-500" />
                 </div>
               </div>
             </div>
 
-            {/* Charts and Additional Stats */}
+            {/* System Health */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* System Health */}
+              {/* Resource Usage */}
               <div className="bg-gray-800 rounded-xl p-6">
-                <h3 className="text-lg font-bold mb-4">System Health</h3>
+                <h3 className="text-lg font-bold mb-4">Resource Usage</h3>
                 <div className="space-y-4">
+                  {/* CPU Usage */}
                   <div>
                     <div className="flex justify-between text-sm mb-2">
-                      <span>CPU Usage</span>
+                      <span className="flex items-center">
+                        <Cpu className="h-4 w-4 mr-2" />
+                        CPU Usage
+                      </span>
                       <span>{systemStats.cpuUsage}%</span>
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2">
@@ -381,40 +388,78 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
                   
+                  {/* Memory Usage */}
                   <div>
                     <div className="flex justify-between text-sm mb-2">
-                      <span>Memory Usage</span>
-                      <span>{systemStats.memoryUsage}%</span>
+                      <span className="flex items-center">
+                        <MemoryStick className="h-4 w-4 mr-2" />
+                        Memory Usage
+                        {systemStats.memoryUsedGB !== undefined && systemStats.memoryTotalGB !== undefined && 
+                          ` (${systemStats.memoryUsedGB}GB / ${systemStats.memoryTotalGB}GB)`
+                        }
+                      </span>
+                      <span className={systemStats.memoryUsage > 85 ? 'text-red-400 font-bold' : ''}>
+                        {systemStats.memoryUsage}%
+                      </span>
                     </div>
                     <div className="w-full bg-gray-700 rounded-full h-2">
                       <div 
                         className={`h-2 rounded-full ${
                           systemStats.memoryUsage < 70 ? 'bg-green-500' : 
-                          systemStats.memoryUsage < 90 ? 'bg-yellow-500' : 'bg-red-500'
+                          systemStats.memoryUsage < 85 ? 'bg-yellow-500' : 'bg-red-500'
                         }`}
                         style={{ width: `${systemStats.memoryUsage}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Storage Usage */}
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="flex items-center">
+                        <HardDrive className="h-4 w-4 mr-2" />
+                        Storage Usage
+                        {systemStats.storageUsedGB !== undefined && systemStats.storageTotalGB !== undefined && 
+                          ` (${systemStats.storageUsedGB}GB / ${systemStats.storageTotalGB}GB)`
+                        }
+                      </span>
+                      <span>{systemStats.storageUsage}%</span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          systemStats.storageUsage < 70 ? 'bg-green-500' : 
+                          systemStats.storageUsage < 90 ? 'bg-yellow-500' : 'bg-red-500'
+                        }`}
+                        style={{ width: `${systemStats.storageUsage}%` }}
                       ></div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Quick Stats */}
+              {/* System Info */}
               <div className="bg-gray-800 rounded-xl p-6">
-                <h3 className="text-lg font-bold mb-4">Quick Stats</h3>
+                <h3 className="text-lg font-bold mb-4">System Information</h3>
                 <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Total Chunks:</span>
-                    <span className="font-bold">{systemStats.totalChunks.toLocaleString()}</span>
-                  </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">System Uptime:</span>
                     <span className="font-bold">{systemStats.systemUptime}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Active Users (24h):</span>
+                    <span className="text-gray-400">Requests/Minute:</span>
+                    <span className="font-bold">{systemStats.requestsPerMinute}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Active Users:</span>
                     <span className="font-bold">
                       {users.filter(u => u.isActive).length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Total Storage Used:</span>
+                    <span className="font-bold">
+                      {systemStats.totalStorageBytes ? formatBytes(systemStats.totalStorageBytes) : 'Calculating...'}
                     </span>
                   </div>
                 </div>
@@ -633,81 +678,6 @@ const AdminDashboard: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
-        )}
-
-        {/* Performance Tab */}
-        {activeTab === 'performance' && systemStats && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Response Time Trends */}
-              <div className="bg-gray-800 rounded-xl p-6">
-                <h3 className="text-lg font-bold mb-4">Response Time Trends</h3>
-                <div className="h-64 flex items-end justify-center space-x-2">
-                  {/* Mock response time bars - in real app, this would be dynamic data */}
-                  {[65, 72, 58, 81, 69, 74, 62].map((value, index) => (
-                    <div key={index} className="flex flex-col items-center">
-                      <div 
-                        className="w-8 bg-blue-500 rounded-t transition-all duration-500"
-                        style={{ height: `${(value / 100) * 200}px` }}
-                      ></div>
-                      <span className="text-xs text-gray-400 mt-2">Day {index + 1}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Document Type Distribution */}
-              <div className="bg-gray-800 rounded-xl p-6">
-                <h3 className="text-lg font-bold mb-4">Document Types</h3>
-                <div className="h-64 flex items-center justify-center">
-                  <div className="relative w-48 h-48">
-                    {/* Mock pie chart segments */}
-                    <div className="absolute inset-0 rounded-full border-8 border-blue-500"></div>
-                    <div className="absolute inset-0 rounded-full border-8 border-green-500 transform -rotate-45"></div>
-                    <div className="absolute inset-0 rounded-full border-8 border-purple-500 transform -rotate-90"></div>
-                    <div className="absolute inset-0 rounded-full border-8 border-yellow-500 transform -rotate-135"></div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-blue-500 rounded"></div>
-                    <span className="text-sm text-gray-300">PDF (45%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-green-500 rounded"></div>
-                    <span className="text-sm text-gray-300">DOCX (30%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-purple-500 rounded"></div>
-                    <span className="text-sm text-gray-300">TXT (15%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 bg-yellow-500 rounded"></div>
-                    <span className="text-sm text-gray-300">Images (10%)</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Performance Metrics */}
-            <div className="bg-gray-800 rounded-xl p-6">
-              <h3 className="text-lg font-bold mb-4">Performance Metrics</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-500">{systemStats.avgResponseTime}ms</div>
-                  <div className="text-sm text-gray-400">Avg Response Time</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-500">99.2%</div>
-                  <div className="text-sm text-gray-400">Uptime</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-500">2.4s</div>
-                  <div className="text-sm text-gray-400">Avg Processing Time</div>
-                </div>
-              </div>
             </div>
           </div>
         )}
