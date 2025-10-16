@@ -23,15 +23,17 @@ import {
 } from 'lucide-react';
 
 interface SystemStats {
-  totalUsers: number;
-  activeSessions: number;
-  totalDocuments: number;
-  totalChunks: number;
-  avgResponseTime: number;
-  systemUptime: string;
-  memoryUsage: number;
-  cpuUsage: number;
-}
+    totalUsers: number;
+    activeSessions: number;
+    totalDocuments: number;
+    totalChunks: number;
+    avgResponseTime: number;
+    systemUptime: string;
+    memoryUsage: number;
+    cpuUsage: number;
+    storageUsage: number; // ADD THIS
+    requestsPerMinute: number; // ADD THIS
+  }
 
 interface User {
   id: string;
@@ -105,7 +107,8 @@ const AdminDashboard: React.FC = () => {
     checkAdminAccess();
   }, [navigate]);
 
-  const loadDashboardData = async () => {
+  // In the loadDashboardData function, update the fetch URLs:
+const loadDashboardData = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('firebaseToken');
@@ -127,7 +130,7 @@ const AdminDashboard: React.FC = () => {
         return;
       }
   
-      // Fetch all data in parallel
+      // Fetch all data in parallel - UPDATE THESE ENDPOINTS
       const [statsResponse, usersResponse, sessionsResponse, docsResponse] = await Promise.all([
         fetch('/api/admin/stats', {
           headers: { 'Authorization': `Bearer ${token}` }

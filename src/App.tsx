@@ -29,14 +29,15 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* FIXED: Add adminOnly prop */}
             <Route
-  path="/admin"
-  element={
-    <ProtectedRoute>
-      <AdminDashboard />
-    </ProtectedRoute>
-  }
-/>
+              path="/admin"
+              element={
+                <ProtectedRoute adminOnly={true}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

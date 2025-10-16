@@ -14,8 +14,8 @@ interface AuthContextType {
   signup: (email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  // CHANGED: getToken is no longer essential for the API calls but kept for potential other uses
   getToken: () => Promise<string | null>;
+  isAdmin: boolean; // ADD THIS
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,9 +28,16 @@ export const useAuth = () => {
   return context;
 };
 
+// Hardcoded admin emails - replace with your actual admin emails
+const ADMIN_EMAILS = [
+  "akhyarahmad919@gmail.com",
+  "ansuthisis789@gmaiil.com"
+];
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false); // ADD THIS
 
   const signup = async (email: string, password: string) => {
     await createUserWithEmailAndPassword(auth, email, password);
@@ -42,25 +49,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     await firebaseSignOut(auth);
-    // REMOVED: No longer need to manually remove the token from localStorage
-    // localStorage.removeItem('authToken');
   };
 
   const getToken = async (): Promise<string | null> => {
     if (auth.currentUser) {
       const token = await auth.currentUser.getIdToken();
-      // REMOVED: We don't store the token in localStorage anymore
-      // localStorage.setItem('authToken', token);
       return token;
     }
     return null;
   };
 
   useEffect(() => {
-    // This listener now just sets the current user state.
-    // Token management is handled dynamically by the api.ts interceptor.
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      
+      // Check if user is admin based on email
+      if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
+        setIsAdmin(true);
+        // Store token for admin access
+        user.getIdToken().then(token => {
+          localStorage.setItem('firebaseToken', token);
+        });
+      } else {
+        setIsAdmin(false);
+        localStorage.removeItem('firebaseToken');
+      }
+      
       setLoading(false);
     });
 
@@ -74,6 +88,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     getToken,
+    isAdmin, // ADD THIS
   };
 
   return (
