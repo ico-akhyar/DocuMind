@@ -9,6 +9,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000,
 });
 
 // CHANGED: The entire request interceptor is now asynchronous to handle fetching a fresh token
