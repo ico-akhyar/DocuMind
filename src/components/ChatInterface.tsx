@@ -22,6 +22,7 @@ interface Message {
 interface ChatInterfaceProps {
   currentSessionId?: string;
   onSessionCleared?: () => void;
+  fullWidth?: boolean; 
 }
 
 export default function ChatInterface({ currentSessionId, onSessionCleared }: ChatInterfaceProps) {
