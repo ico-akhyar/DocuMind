@@ -5,8 +5,10 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  signInWithPopup, // ADD THIS
+  GoogleAuthProvider, // ADD THIS
 } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { auth, googleProvider } from '../config/firebase'; // UPDATE THIS
 
 interface AuthContextType {
   currentUser: User | null;
@@ -15,7 +17,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
-  isAdmin: boolean; // ADD THIS
+  isAdmin: boolean;
+  signInWithGoogle: () => Promise<void>; // ADD THIS
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,7 +40,7 @@ const ADMIN_EMAILS = [
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false); // ADD THIS
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const signup = async (email: string, password: string) => {
     await createUserWithEmailAndPassword(auth, email, password);
@@ -49,6 +52,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     await firebaseSignOut(auth);
+  };
+
+  // ADD THIS FUNCTION
+  const signInWithGoogle = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      // This gives you a Google Access Token. You can use it to access Google APIs.
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const token = credential?.accessToken;
+      
+      // The signed-in user info
+      const user = result.user;
+      console.log('Google sign-in successful:', user);
+      
+    } catch (error: any) {
+      console.error('Google sign-in error:', error);
+      
+      // Handle Errors here
+      const errorCode = error.code;
+      const errorMessage = error.message;
+      
+      // The email of the user's account used
+      const email = error.customData?.email;
+      
+      // The AuthCredential type that was used
+      const credential = GoogleAuthProvider.credentialFromError(error);
+      
+      throw new Error(errorMessage || 'Google sign-in failed');
+    }
   };
 
   const getToken = async (): Promise<string | null> => {
@@ -88,7 +120,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     getToken,
-    isAdmin, // ADD THIS
+    isAdmin,
+    signInWithGoogle, // ADD THIS
   };
 
   return (
