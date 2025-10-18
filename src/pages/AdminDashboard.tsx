@@ -1,9 +1,10 @@
 // AdminDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext'; // ADD THIS IMPORT
 import { 
     Users, 
-    Database,  // ADD THIS IMPORT
+    Database,
     Clock, 
     FileText, 
     Cpu, 
@@ -71,6 +72,7 @@ interface Document {
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { getToken } = useAuth(); // ADD THIS
   const [activeTab, setActiveTab] = useState('overview');
   const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -83,59 +85,15 @@ const AdminDashboard: React.FC = () => {
   // API base URL - update this to match your backend
   const API_BASE_URL = 'https://akhyar919-documind.hf.space';
 
-  // Check if user is admin
-  useEffect(() => {
-    const checkAdminAccess = async () => {
-      try {
-        const token = localStorage.getItem('firebaseToken');
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/admin/verify`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!response.ok) {
-          console.error('Admin verification failed:', response.status);
-          navigate('/documind');
-          return;
-        }
-
-        loadDashboardData();
-      } catch (error) {
-        console.error('Admin access check failed:', error);
-        navigate('/documind');
-      }
-    };
-
-    checkAdminAccess();
-  }, [navigate]);
-
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       setError('');
-      const token = localStorage.getItem('firebaseToken');
+      const token = await getToken(); // FIX: Get token from AuthContext
       
       if (!token) {
+        // This should not happen due to ProtectedRoute, but as a safeguard:
         navigate('/login');
-        return;
-      }
-
-      // Verify admin access first
-      const verifyResponse = await fetch(`${API_BASE_URL}/admin/verify`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!verifyResponse.ok) {
-        console.error('Admin verification failed:', verifyResponse.status);
-        navigate('/documind');
         return;
       }
 
@@ -155,16 +113,17 @@ const AdminDashboard: React.FC = () => {
         })
       ]);
 
-      // Check if responses are OK and content type is JSON
+      // Handle non-ok responses
       const responses = [statsResponse, usersResponse, sessionsResponse, docsResponse];
       for (const response of responses) {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error('Server returned non-JSON response');
-        }
+          if (response.status === 403 || response.status === 401) {
+              console.error('Admin verification failed on data fetch:', response.status);
+              navigate('/documind'); // Redirect if not authorized
+              return;
+          }
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
       }
 
       const [statsData, usersData, sessionsData, docsData] = await Promise.all([
@@ -181,12 +140,16 @@ const AdminDashboard: React.FC = () => {
       setLastUpdated(new Date());
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
-      setError('Failed to load admin data. Please check if the server is running and accessible.');
-      // Don't navigate away, show error on page
+      setError('Failed to load admin data. The server might be unavailable or you may not have access.');
     } finally {
       setLoading(false);
     }
   };
+
+  // FIX: Removed the redundant verification useEffect. Load data on component mount.
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';

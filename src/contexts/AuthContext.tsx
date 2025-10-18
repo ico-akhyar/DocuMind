@@ -5,10 +5,10 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  signInWithPopup, // ADD THIS
-  GoogleAuthProvider, // ADD THIS
+  signInWithPopup,
+  GoogleAuthProvider,
 } from 'firebase/auth';
-import { auth, googleProvider } from '../config/firebase'; // UPDATE THIS
+import { auth, googleProvider } from '../config/firebase';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -18,7 +18,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
   isAdmin: boolean;
-  signInWithGoogle: () => Promise<void>; // ADD THIS
+  signInWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,32 +54,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await firebaseSignOut(auth);
   };
 
-  // ADD THIS FUNCTION
   const signInWithGoogle = async () => {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      // This gives you a Google Access Token. You can use it to access Google APIs.
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      const token = credential?.accessToken;
-      
-      // The signed-in user info
-      const user = result.user;
-      console.log('Google sign-in successful:', user);
-      
+      await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
       console.error('Google sign-in error:', error);
-      
-      // Handle Errors here
-      const errorCode = error.code;
-      const errorMessage = error.message;
-      
-      // The email of the user's account used
-      const email = error.customData?.email;
-      
-      // The AuthCredential type that was used
-      const credential = GoogleAuthProvider.credentialFromError(error);
-      
-      throw new Error(errorMessage || 'Google sign-in failed');
+      throw new Error(error.message || 'Google sign-in failed');
     }
   };
 
@@ -98,13 +78,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Check if user is admin based on email
       if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
         setIsAdmin(true);
-        // Store token for admin access
-        user.getIdToken().then(token => {
-          localStorage.setItem('firebaseToken', token);
-        });
       } else {
         setIsAdmin(false);
-        localStorage.removeItem('firebaseToken');
       }
       
       setLoading(false);
@@ -121,7 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logout,
     getToken,
     isAdmin,
-    signInWithGoogle, // ADD THIS
+    signInWithGoogle,
   };
 
   return (
