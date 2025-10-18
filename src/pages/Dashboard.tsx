@@ -25,7 +25,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-theme-background transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
       <Header />
 
       {/* Dashboard Header Section */}
@@ -67,10 +67,10 @@ export default function Dashboard() {
           </div>
 
           <div className="flex-1 flex gap-6">
-            {/* Sidebar - Smooth slide animation */}
+            {/* Sidebar - Wider when open for better readability */}
             <div className={`
               transition-all duration-500 ease-in-out
-              ${sidebarOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 overflow-hidden'}
+              ${sidebarOpen ? 'w-96 opacity-100' : 'w-0 opacity-0 overflow-hidden'}
             `}>
               <div className="space-y-6">
                 <FileUpload 
