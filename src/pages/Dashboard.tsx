@@ -3,12 +3,12 @@ import Header from '../components/Header';
 import FileUpload from '../components/FileUpload';
 import DocumentList from '../components/DocumentList';
 import ChatInterface from '../components/ChatInterface';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'; // Add this import
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
 export default function Dashboard() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
-  const [sidebarOpen, setSidebarOpen] = useState(true); // Add this state
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const handleUploadSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -51,11 +51,11 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex gap-6">
-          {/* Sidebar Toggle Button */}
-          <div className="flex items-start">
+          {/* Sidebar Toggle Button - Fixed position */}
+          <div className="flex items-start sticky top-6 z-10">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl"
+              className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-110"
               title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
             >
               {sidebarOpen ? (
@@ -66,10 +66,13 @@ export default function Dashboard() {
             </button>
           </div>
 
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Sidebar Sections - Conditionally rendered */}
-            {sidebarOpen && (
-              <div className="lg:col-span-1 space-y-6">
+          <div className="flex-1 flex gap-6">
+            {/* Sidebar - Smooth slide animation */}
+            <div className={`
+              transition-all duration-500 ease-in-out
+              ${sidebarOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 overflow-hidden'}
+            `}>
+              <div className="space-y-6">
                 <FileUpload 
                   onUploadSuccess={handleUploadSuccess} 
                   currentSessionId={currentSessionId}
@@ -77,13 +80,17 @@ export default function Dashboard() {
                 />
                 <DocumentList refreshTrigger={refreshTrigger} />
               </div>
-            )}
+            </div>
 
-            {/* Chat Interface - Takes remaining space */}
-            <div className={sidebarOpen ? "lg:col-span-3" : "lg:col-span-4"}>
+            {/* Chat Interface - Expands to fill remaining space */}
+            <div className={`
+              transition-all duration-500 ease-in-out
+              ${sidebarOpen ? 'flex-1' : 'w-full'}
+            `}>
               <ChatInterface 
                 currentSessionId={currentSessionId}
                 onSessionCleared={handleSessionCleared}
+                fullWidth={!sidebarOpen}
               />
             </div>
           </div>
