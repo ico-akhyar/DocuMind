@@ -172,7 +172,7 @@ export default function ChatInterface({ currentSessionId, onSessionCleared }: Ch
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg flex flex-col h-[600px] transition-colors duration-300">
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg flex flex-col h-[800px] transition-colors duration-300">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Chat with Your Documents</h3>
 
