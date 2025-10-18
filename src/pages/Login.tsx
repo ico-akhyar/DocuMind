@@ -19,7 +19,7 @@ export default function Login() {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      navigate('/documind');
     } catch (err: any) {
       setError(err.message || 'Failed to log in. Please check your credentials.');
     } finally {

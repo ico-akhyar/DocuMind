@@ -30,7 +30,7 @@ export default function Register() {
 
     try {
       await signup(email, password);
-      navigate('/dashboard');
+      navigate('/documind');
     } catch (err: any) {
       setError(err.message || 'Failed to create account. Please try again.');
     } finally {
