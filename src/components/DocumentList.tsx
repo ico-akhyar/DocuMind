@@ -35,6 +35,7 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
       setLastRefreshed(new Date());
       setRefreshSuccess(true);
       
+      // Auto-hide success indicator after 2 seconds
       setTimeout(() => setRefreshSuccess(false), 2000);
     } catch (err) {
       console.error('Failed to fetch documents:', err);
@@ -80,15 +81,15 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700">
+      <div className="bg-theme-surface rounded-xl shadow-lg p-6 border border-theme-secondary">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Your Documents</h3>
-          <div className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-blue-600 rounded-full animate-spin"></div>
+          <h3 className="text-xl font-semibold text-theme-primary">Your Documents</h3>
+          <div className="w-6 h-6 border-2 border-theme-secondary border-t-blue-600 rounded-full animate-spin"></div>
         </div>
         <div className="animate-pulse space-y-4">
-          <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-1/4"></div>
-          <div className="h-16 bg-gray-300 dark:bg-gray-700 rounded"></div>
-          <div className="h-16 bg-gray-300 dark:bg-gray-700 rounded"></div>
+          <div className="h-4 bg-theme-secondary rounded w-1/4"></div>
+          <div className="h-16 bg-theme-secondary rounded"></div>
+          <div className="h-16 bg-theme-secondary rounded"></div>
         </div>
       </div>
     );
@@ -96,12 +97,12 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
 
   return (
     <>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:shadow-xl">
+      <div className="bg-theme-surface rounded-xl shadow-lg p-6 border border-theme-secondary transition-all duration-300 hover:shadow-xl">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Your Documents</h3>
+          <h3 className="text-xl font-semibold text-theme-primary">Your Documents</h3>
           <div className="flex items-center gap-3">
             {lastRefreshed && (
-              <span className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+              <span className="text-xs text-theme-secondary font-medium">
                 Updated {formatTimeSince(lastRefreshed)}
               </span>
             )}
@@ -111,7 +112,7 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
               className={`p-2 rounded-lg transition-all duration-200 ${
                 refreshing 
                   ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' 
-                  : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 hover:text-blue-600'
+                  : 'bg-theme-secondary hover:bg-theme-accent text-theme-primary hover:text-blue-600'
               } disabled:opacity-50`}
               title="Refresh documents"
             >
@@ -128,9 +129,9 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
 
         {documents.length === 0 ? (
           <div className="text-center py-8">
-            <FileText className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-3" />
-            <p className="text-gray-600 dark:text-gray-400 font-medium">No documents uploaded yet</p>
-            <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Upload your first document to get started</p>
+            <FileText className="h-12 w-12 text-theme-secondary mx-auto mb-3" />
+            <p className="text-theme-secondary font-medium">No documents uploaded yet</p>
+            <p className="text-sm text-theme-secondary mt-1">Upload your first document to get started</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -147,7 +148,7 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <HardDrive className="h-5 w-5 text-green-600" />
-                  <h4 className="font-medium text-gray-900 dark:text-white">Permanent Documents</h4>
+                  <h4 className="font-medium text-theme-primary">Permanent Documents</h4>
                   <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 py-1 rounded-full font-medium">
                     {permanentDocs.length}
                   </span>
@@ -164,7 +165,7 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
               <div>
                 <div className="flex items-center gap-2 mb-3">
                   <Clock className="h-5 w-5 text-orange-600" />
-                  <h4 className="font-medium text-gray-900 dark:text-white">Session Documents</h4>
+                  <h4 className="font-medium text-theme-primary">Session Documents</h4>
                   <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-1 rounded-full font-medium">
                     {sessionDocs.length}
                   </span>
@@ -182,17 +183,17 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
 
       {deleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-2xl transform transition-all duration-300 border border-gray-200 dark:border-gray-700">
+          <div className="bg-theme-surface rounded-2xl p-6 max-w-md w-full shadow-2xl transform transition-all duration-300 border border-theme-secondary">
             <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
                 <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h3 className="text-lg font-semibold text-theme-primary">
                 Delete Document
               </h3>
             </div>
             
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-theme-secondary mb-6">
               Are you sure you want to delete <strong>"{deleteModal}"</strong>? This action cannot be undone and will remove all associated data.
             </p>
             
@@ -200,7 +201,7 @@ export default function DocumentList({ refreshTrigger }: DocumentListProps) {
               <button
                 onClick={() => setDeleteModal(null)}
                 disabled={deleting}
-                className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-xl transition-all duration-200 disabled:opacity-50 font-medium border border-gray-200 dark:border-gray-600"
+                className="flex-1 px-4 py-3 bg-theme-secondary hover:bg-theme-accent text-theme-primary rounded-xl transition-all duration-200 disabled:opacity-50 font-medium border border-theme-secondary"
               >
                 Cancel
               </button>
@@ -267,7 +268,7 @@ function DocumentCard({ doc, onDelete }: { doc: Document; onDelete: (filename: s
   };
 
   return (
-    <div className={`flex items-center gap-3 p-4 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-750 rounded-xl transition-all duration-300 group border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md ${
+    <div className={`flex items-center gap-3 p-4 bg-theme-primary hover:bg-theme-accent rounded-xl transition-all duration-300 group border border-theme-secondary hover:border-theme-accent hover:shadow-md ${
       isDeleting ? 'opacity-50 scale-95' : ''
     }`}>
       <div className="flex-shrink-0">
@@ -277,16 +278,16 @@ function DocumentCard({ doc, onDelete }: { doc: Document; onDelete: (filename: s
       </div>
       
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-gray-900 dark:text-white truncate text-sm">{doc.filename}</p>
+        <p className="font-semibold text-theme-primary truncate text-sm">{doc.filename}</p>
         <div className="flex items-center gap-3 mt-1">
-          <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+          <p className="text-xs text-theme-secondary font-medium">
             {doc.chunk_count} {doc.chunk_count === 1 ? 'chunk' : 'chunks'}
           </p>
-          <span className="text-xs text-gray-400">•</span>
-          <p className="text-xs text-gray-600 dark:text-gray-400 font-medium">
+          <span className="text-xs text-theme-secondary">•</span>
+          <p className="text-xs text-theme-secondary font-medium">
             {formatDate(doc.uploaded_at)}
           </p>
-          <span className="text-xs text-gray-400">•</span>
+          <span className="text-xs text-theme-secondary">•</span>
           <span className={`text-xs px-2 py-1 rounded-full font-medium ${
             doc.document_type === 'PERMANENT' 
               ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -300,7 +301,7 @@ function DocumentCard({ doc, onDelete }: { doc: Document; onDelete: (filename: s
       <button
         onClick={handleDeleteClick}
         disabled={isDeleting}
-        className="p-2 text-gray-600 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 disabled:opacity-50"
+        className="p-2 text-theme-secondary hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 disabled:opacity-50"
         title="Delete document"
       >
         {isDeleting ? (
