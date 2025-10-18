@@ -25,7 +25,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
+    <div className="min-h-screen bg-theme-background transition-colors duration-300">
       <Header />
 
       {/* Dashboard Header Section */}

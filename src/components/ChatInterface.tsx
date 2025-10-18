@@ -22,7 +22,6 @@ interface Message {
 interface ChatInterfaceProps {
   currentSessionId?: string;
   onSessionCleared?: () => void;
-  fullWidth?: boolean; 
 }
 
 export default function ChatInterface({ currentSessionId, onSessionCleared }: ChatInterfaceProps) {
@@ -173,11 +172,7 @@ export default function ChatInterface({ currentSessionId, onSessionCleared }: Ch
   };
 
   return (
-    <div className={`
-      bg-white dark:bg-gray-800 rounded-xl shadow-lg flex flex-col 
-      transition-all duration-500 ease-in-out
-      ${fullWidth ? 'h-[80vh]' : 'h-[700px]'}
-    `}>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg flex flex-col h-[800px] transition-colors duration-300">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Chat with Your Documents</h3>
 
