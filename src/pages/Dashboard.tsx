@@ -1,3 +1,4 @@
+// In Dashboard.tsx, replace the entire file with this:
 import { useState } from 'react';
 import Header from '../components/Header';
 import FileUpload from '../components/FileUpload';
@@ -25,7 +26,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-theme-background transition-colors duration-300">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300">
       <Header />
 
       {/* Dashboard Header Section */}
@@ -51,7 +52,7 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex gap-6">
-          {/* Sidebar Toggle Button - Fixed position */}
+          {/* Sidebar Toggle Button */}
           <div className="flex items-start sticky top-6 z-10">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -67,26 +68,22 @@ export default function Dashboard() {
           </div>
 
           <div className="flex-1 flex gap-6">
-            {/* Sidebar - Smooth slide animation */}
-            <div className={`
-              transition-all duration-500 ease-in-out
-              ${sidebarOpen ? 'w-80 opacity-100' : 'w-0 opacity-0 overflow-hidden'}
-            `}>
-              <div className="space-y-6">
-                <FileUpload 
-                  onUploadSuccess={handleUploadSuccess} 
-                  currentSessionId={currentSessionId}
-                  onSessionCreated={handleSessionCreated}
-                />
-                <DocumentList refreshTrigger={refreshTrigger} />
+            {/* Sidebar */}
+            {sidebarOpen && (
+              <div className="w-80 transition-all duration-500 ease-in-out">
+                <div className="space-y-6">
+                  <FileUpload 
+                    onUploadSuccess={handleUploadSuccess} 
+                    currentSessionId={currentSessionId}
+                    onSessionCreated={handleSessionCreated}
+                  />
+                  <DocumentList refreshTrigger={refreshTrigger} />
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Chat Interface - Expands to fill remaining space */}
-            <div className={`
-              transition-all duration-500 ease-in-out
-              ${sidebarOpen ? 'flex-1' : 'w-full'}
-            `}>
+            {/* Chat Interface */}
+            <div className={`transition-all duration-500 ease-in-out ${sidebarOpen ? 'flex-1' : 'w-full'}`}>
               <ChatInterface 
                 currentSessionId={currentSessionId}
                 onSessionCleared={handleSessionCleared}
