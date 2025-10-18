@@ -90,7 +90,6 @@ export default function Dashboard() {
               <ChatInterface 
                 currentSessionId={currentSessionId}
                 onSessionCleared={handleSessionCleared}
-                fullWidth={!sidebarOpen}
               />
             </div>
           </div>
