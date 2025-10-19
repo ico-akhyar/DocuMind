@@ -3,18 +3,20 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  adminOnly?: boolean; // ADD THIS
+  // CHANGE: Rename prop to moderatorOnly
+  moderatorOnly?: boolean;
 }
 
-export default function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
-  const { currentUser, isAdmin } = useAuth();
+export default function ProtectedRoute({ children, moderatorOnly = false }: ProtectedRouteProps) {
+  // CHANGE: Destructure isModerator from useAuth
+  const { currentUser, isModerator } = useAuth();
 
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
-  // ADD THIS: Redirect non-admin users trying to access admin pages
-  if (adminOnly && !isAdmin) {
+  // CHANGE: Check for moderator access instead of admin
+  if (moderatorOnly && !isModerator) {
     return <Navigate to="/documind" replace />;
   }
 

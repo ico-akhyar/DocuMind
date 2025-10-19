@@ -6,7 +6,6 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   signInWithPopup,
-  GoogleAuthProvider,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../config/firebase';
 
@@ -17,7 +16,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   getToken: () => Promise<string | null>;
-  isAdmin: boolean;
+  // CHANGE: Rename isAdmin to isModerator for clarity
+  isModerator: boolean;
   signInWithGoogle: () => Promise<void>;
 }
 
@@ -26,13 +26,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
 
-// Hardcoded admin emails - replace with your actual admin emails
-const ADMIN_EMAILS = [
+// CHANGE: Rename to reflect the new role
+const MODERATOR_EMAILS = [
   "akhyarahmad919@gmail.com",
   "ansuthisis789@gmaiil.com"
 ];
@@ -40,33 +40,28 @@ const ADMIN_EMAILS = [
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  // CHANGE: Rename isAdmin state to isModerator
+  const [isModerator, setIsModerator] = useState(false);
 
-  const signup = async (email: string, password: string) => {
-    await createUserWithEmailAndPassword(auth, email, password);
+  const signup = (email: string, password: string) => {
+    return createUserWithEmailAndPassword(auth, email, password).then(() => {});
   };
 
-  const login = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+  const login = (email: string, password: string) => {
+    return signInWithEmailAndPassword(auth, email, password).then(() => {});
   };
 
-  const logout = async () => {
-    await firebaseSignOut(auth);
+  const logout = () => {
+    return firebaseSignOut(auth);
   };
 
-  const signInWithGoogle = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error('Google sign-in error:', error);
-      throw new Error(error.message || 'Google sign-in failed');
-    }
+  const signInWithGoogle = () => {
+    return signInWithPopup(auth, googleProvider).then(() => {});
   };
 
   const getToken = async (): Promise<string | null> => {
     if (auth.currentUser) {
-      const token = await auth.currentUser.getIdToken();
-      return token;
+      return auth.currentUser.getIdToken();
     }
     return null;
   };
@@ -75,11 +70,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       
-      // Check if user is admin based on email
-      if (user && user.email && ADMIN_EMAILS.includes(user.email)) {
-        setIsAdmin(true);
+      // CHANGE: Check if user is a moderator
+      if (user && user.email && MODERATOR_EMAILS.includes(user.email)) {
+        setIsModerator(true);
       } else {
-        setIsAdmin(false);
+        setIsModerator(false);
       }
       
       setLoading(false);
@@ -95,7 +90,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     login,
     logout,
     getToken,
-    isAdmin,
+    // CHANGE: Pass isModerator in the context value
+    isModerator,
     signInWithGoogle,
   };
 

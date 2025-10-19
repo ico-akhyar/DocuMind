@@ -8,7 +8,8 @@ import Dashboard from './pages/Dashboard';
 import DocuMind from './pages/DocuMind';
 import ApiPage from './pages/ApiPage';
 import ProtectedRoute from './components/ProtectedRoute';
-import AdminDashboard from './pages/AdminDashboard';
+// CHANGE: Import the new ModeratorDashboard
+import ModeratorDashboard from './pages/ModeratorDashboard';
 
 function App() {
   return (
@@ -29,12 +30,12 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            {/* FIXED: Add adminOnly prop */}
+            {/* CHANGE: Update route, component, and prop for moderator */}
             <Route
-              path="/admin"
+              path="/moderator"
               element={
-                <ProtectedRoute adminOnly={true}>
-                  <AdminDashboard />
+                <ProtectedRoute moderatorOnly={true}>
+                  <ModeratorDashboard />
                 </ProtectedRoute>
               }
             />
