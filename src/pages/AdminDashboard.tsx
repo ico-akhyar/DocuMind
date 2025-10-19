@@ -21,23 +21,23 @@ import {
     HardDrive
   } from 'lucide-react';
 
-interface SystemStats {
-  totalUsers: number;
-  activeSessions: number;
-  totalDocuments: number;
-  totalChunks: number;
-  avgResponseTime: number;
-  systemUptime: string;
-  memoryUsage: number;
-  memoryUsedGB?: number;
-  memoryTotalGB?: number;
-  cpuUsage: number;
-  storageUsage: number;
-  storageUsedGB?: number;
-  storageTotalGB?: number;
-  requestsPerMinute: number;
-  totalStorageBytes?: number;
-}
+  interface SystemStats {
+    totalUsers: number;
+    activeSessions: number;
+    totalDocuments: number;
+    totalChunks: number;
+    avgResponseTime: number;
+    systemUptime: string;
+    memoryUsage: number;
+    memoryUsedGB: number;
+    memoryTotalGB: number;
+    cpuUsage: number;
+    storageUsage: number;
+    storageUsedGB: number;
+    storageTotalGB: number;
+    requestsPerMinute: number;
+    totalStorageBytes: number;
+  }
 
 interface User {
   id: string;
