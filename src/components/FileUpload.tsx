@@ -142,7 +142,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
               Select File
             </button>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Supported: PDF, DOCX, TXT, JPG, PNG (Max 10MB)
+              Supported: PDF, DOCX, TXT, JPG, PNG (Max 50MB)
             </p>
           </div>
         ) : (
