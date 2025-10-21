@@ -61,27 +61,33 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
 
   const handleUpload = async () => {
     if (!selectedFile) return;
-
+  
     setUploading(true);
     setError('');
-
+  
     try {
       console.log('📤 Uploading file with isPermanent:', isPermanent);
-      console.log('📤 File will be uploaded as:', isPermanent ? 'PERMANENT' : 'SESSION');
       
       const response = await uploadDocument(selectedFile, isPermanent);
       
       console.log('✅ Upload response:', response.data);
       
-      // If this is a session upload and we got a session ID, notify parent
-      if (!isPermanent && response.data.session_id && onSessionCreated) {
-        onSessionCreated(response.data.session_id);
+      // Show immediate success - processing happens in background
+      if (response.data.status === 'queued' || response.data.status === 'processing') {
+        // If this is a session upload and we got a session ID, notify parent
+        if (!isPermanent && response.data.session_id && onSessionCreated) {
+          onSessionCreated(response.data.session_id);
+        }
+        
+        setSelectedFile(null);
+        onUploadSuccess();
+        
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        
+        // Show success message
+        setError(''); // Clear any errors
       }
       
-      setSelectedFile(null);
-      onUploadSuccess();
-      
-      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
       console.error('Upload error:', err);
       setError(err.response?.data?.detail || err.message || 'Upload failed');
