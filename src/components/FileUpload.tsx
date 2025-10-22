@@ -1,12 +1,21 @@
-// FileUpload.tsx
-import { useState, useRef } from 'react';
+// FileUpload.tsx - Complete updated version
+import { useState, useRef, useEffect } from 'react';
 import { Upload, File, X } from 'lucide-react';
-import { uploadDocument } from '../services/api';
+import { uploadDocument, getUploadStatus } from '../services/api';
 
 interface FileUploadProps {
   onUploadSuccess: () => void;
   currentSessionId?: string;
   onSessionCreated?: (sessionId: string) => void;
+}
+
+interface ProcessingStatus {
+  document_id: number;
+  filename: string;
+  status: string;
+  processing_stage: string;
+  chunk_count: number;
+  completed: boolean;
 }
 
 export default function FileUpload({ onUploadSuccess, currentSessionId, onSessionCreated }: FileUploadProps) {
@@ -18,6 +27,68 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStage, setUploadStage] = useState<'preparing' | 'uploading' | 'processing' | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
+  const [processingInterval, setProcessingInterval] = useState<NodeJS.Timeout | null>(null);
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (processingInterval) {
+        clearInterval(processingInterval);
+      }
+    };
+  }, [processingInterval]);
+
+  const startProgressPolling = (documentId: number) => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await getUploadStatus(documentId);
+        const status = response.data;
+        setProcessingStatus(status);
+        
+        // Update progress based on status
+        if (status.status === 'extracting') {
+          setUploadStage('processing');
+          setUploadProgress(25);
+        } else if (status.status === 'chunking') {
+          setUploadStage('processing');
+          setUploadProgress(50);
+        } else if (status.status === 'embedding') {
+          setUploadStage('processing');
+          setUploadProgress(75);
+        } else if (status.status === 'storing') {
+          setUploadStage('processing');
+          setUploadProgress(90);
+        } else if (status.status === 'completed') {
+          setUploadStage('processing');
+          setUploadProgress(100);
+          setProcessingStatus(status);
+          if (processingInterval) {
+            clearInterval(processingInterval);
+          }
+          // Wait a bit then refresh documents
+          setTimeout(() => {
+            onUploadSuccess();
+            setUploadStage(null);
+            setUploadProgress(0);
+            setProcessingStatus(null);
+          }, 2000);
+        } else if (status.status === 'failed') {
+          setError('Document processing failed. Please try again.');
+          setUploadStage(null);
+          setUploadProgress(0);
+          setProcessingStatus(null);
+          if (processingInterval) {
+            clearInterval(processingInterval);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch processing status:', err);
+      }
+    }, 2000); // Poll every 2 seconds
+    
+    setProcessingInterval(interval);
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -69,6 +140,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setError('');
     setUploadProgress(0);
     setUploadStage('preparing');
+    setProcessingStatus(null);
   
     try {
       console.log('📤 Uploading file with isPermanent:', isPermanent);
@@ -94,15 +166,11 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
         setSelectedFile(null);
         setUploadProgress(100);
         setUploadStage('processing');
-        onUploadSuccess();
+        
+        // Start polling for processing progress
+        startProgressPolling(response.data.document_id);
         
         if (fileInputRef.current) fileInputRef.current.value = '';
-        
-        // Reset progress after success
-        setTimeout(() => {
-          setUploadProgress(0);
-          setUploadStage(null);
-        }, 2000);
       }
       
     } catch (err: any) {
@@ -110,6 +178,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
       setError(err.response?.data?.detail || err.message || 'Upload failed');
       setUploadProgress(0);
       setUploadStage(null);
+      setProcessingStatus(null);
     } finally {
       setUploading(false);
     }
@@ -120,6 +189,11 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setError('');
     setUploadProgress(0);
     setUploadStage(null);
+    setProcessingStatus(null);
+    if (processingInterval) {
+      clearInterval(processingInterval);
+      setProcessingInterval(null);
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -128,6 +202,32 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const getUploadMethod = () => {
     if (!selectedFile) return '';
     return selectedFile.size > 5 * 1024 * 1024 ? 'Chunked Upload' : 'Direct Upload';
+  };
+
+  const getProcessingStageText = () => {
+    if (!processingStatus) {
+      if (uploadStage === 'preparing') return 'Preparing upload...';
+      if (uploadStage === 'uploading') return 'Uploading file...';
+      return 'Starting processing...';
+    }
+    
+    const statusMap: { [key: string]: string } = {
+      'queued': 'Queued for processing...',
+      'processing': 'Starting processing...',
+      'extracting': 'Extracting text from document...',
+      'chunking': processingStatus.processing_stage || 'Breaking text into chunks...',
+      'embedding': processingStatus.processing_stage || 'Generating AI embeddings...',
+      'storing': 'Storing in database...',
+      'completed': 'Processing complete!',
+      'failed': 'Processing failed'
+    };
+    
+    return statusMap[processingStatus.status] || `Processing: ${processingStatus.status}`;
+  };
+
+  const getChunkCountText = () => {
+    if (!processingStatus || processingStatus.chunk_count === 0) return '';
+    return `${processingStatus.chunk_count} chunks processed`;
   };
 
   return (
@@ -196,7 +296,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
               <button
                 onClick={removeSelectedFile}
                 className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
-                disabled={uploading}
+                disabled={uploading || processingStatus !== null}
               >
                 <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </button>
@@ -215,7 +315,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                     checked={isPermanent}
                     onChange={() => setIsPermanent(true)}
                     className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                    disabled={uploading}
+                    disabled={uploading || processingStatus !== null}
                   />
                   <div className="flex-1">
                     <span className="font-medium text-gray-900 dark:text-white">Permanent</span>
@@ -232,7 +332,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                     checked={!isPermanent}
                     onChange={() => setIsPermanent(false)}
                     className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                    disabled={uploading}
+                    disabled={uploading || processingStatus !== null}
                   />
                   <div className="flex-1">
                     <span className="font-medium text-gray-900 dark:text-white">Session Only</span>
@@ -252,28 +352,35 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
               </div>
             </div>
 
-            {/* Progress Bar */}
-            {uploadStage && (
-              <div className="space-y-2">
+            {/* Enhanced Progress Bar with Processing Status */}
+            {(uploadStage || processingStatus) && (
+              <div className="space-y-3">
                 <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                  <span>
-                    {uploadStage === 'preparing' && 'Preparing upload...'}
-                    {uploadStage === 'uploading' && 'Uploading file...'}
-                    {uploadStage === 'processing' && 'Processing document...'}
+                  <span className="font-medium">
+                    {getProcessingStageText()}
                   </span>
                   <span>{uploadProgress}%</span>
                 </div>
+                
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
                   <div 
                     className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${uploadProgress}%` }}
                   ></div>
                 </div>
+                
+                {getChunkCountText() && (
+                  <p className="text-xs text-green-600 dark:text-green-400 text-center">
+                    ✅ {getChunkCountText()}
+                  </p>
+                )}
+                
                 <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
                   {selectedFile.size > 5 * 1024 * 1024 
-                    ? 'Using chunked upload for large file...' 
-                    : 'Using direct upload...'
+                    ? 'Using chunked upload for large file' 
+                    : 'Using direct upload'
                   }
+                  {processingStatus && processingStatus.processing_stage && ` • ${processingStatus.processing_stage}`}
                 </p>
               </div>
             )}
@@ -281,13 +388,18 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
             {/* Upload Button */}
             <button
               onClick={handleUpload}
-              disabled={uploading}
+              disabled={uploading || processingStatus !== null}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 disabled:transform-none"
             >
               {uploading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
+                </div>
+              ) : processingStatus ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Processing...
                 </div>
               ) : (
                 `Upload as ${isPermanent ? 'Permanent' : 'Session'} Document`
