@@ -8,12 +8,78 @@ interface FileUploadProps {
   onSessionCreated?: (sessionId: string) => void;
 }
 
+// Compression utility
+class FileCompressor {
+  static async compressFile(file: File): Promise<{ blob: Blob; isCompressed: boolean; originalSize: number; compressedSize: number }> {
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExtension || '');
+    
+    // Skip compression for images to maintain OCR quality
+    if (isImage) {
+      console.log('🖼️ Skipping compression for image file');
+      return {
+        blob: file,
+        isCompressed: false,
+        originalSize: file.size,
+        compressedSize: file.size
+      };
+    }
+
+    console.log('🗜️ Compressing file:', file.name);
+    
+    try {
+      // Read file content
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Create gzip compressed blob
+      const compressedStream = new CompressionStream('gzip');
+      const writer = compressedStream.writable.getWriter();
+      writer.write(new Uint8Array(arrayBuffer));
+      writer.close();
+      
+      const compressedBlob = await new Response(compressedStream.readable).blob();
+      
+      const compressionInfo = {
+        blob: compressedBlob,
+        isCompressed: true,
+        originalSize: file.size,
+        compressedSize: compressedBlob.size
+      };
+      
+      console.log('✅ Compression complete:', {
+        original: this.formatBytes(file.size),
+        compressed: this.formatBytes(compressedBlob.size),
+        ratio: `${((compressedBlob.size / file.size) * 100).toFixed(1)}%`
+      });
+      
+      return compressionInfo;
+    } catch (error) {
+      console.error('❌ Compression failed, using original file:', error);
+      return {
+        blob: file,
+        isCompressed: false,
+        originalSize: file.size,
+        compressedSize: file.size
+      };
+    }
+  }
+
+  static formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+}
+
 export default function FileUpload({ onUploadSuccess, currentSessionId, onSessionCreated }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [isPermanent, setIsPermanent] = useState(true);
   const [error, setError] = useState('');
+  const [compressionInfo, setCompressionInfo] = useState<{isCompressed: boolean; originalSize: number; compressedSize: number} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -57,6 +123,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
 
     setError('');
     setSelectedFile(file);
+    setCompressionInfo(null); // Reset compression info when new file is selected
   };
 
   const handleUpload = async () => {
@@ -69,7 +136,20 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
       console.log('📤 Uploading file with isPermanent:', isPermanent);
       console.log('📤 File will be uploaded as:', isPermanent ? 'PERMANENT' : 'SESSION');
       
-      const response = await uploadDocument(selectedFile, isPermanent);
+      // Compress file before upload
+      const compressionResult = await FileCompressor.compressFile(selectedFile);
+      setCompressionInfo({
+        isCompressed: compressionResult.isCompressed,
+        originalSize: compressionResult.originalSize,
+        compressedSize: compressionResult.compressedSize
+      });
+
+      const response = await uploadDocument(
+        compressionResult.blob, 
+        selectedFile.name,
+        compressionResult.isCompressed,
+        isPermanent
+      );
       
       console.log('✅ Upload response:', response.data);
       
@@ -79,6 +159,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
       }
       
       setSelectedFile(null);
+      setCompressionInfo(null);
       onUploadSuccess();
       
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -92,6 +173,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
 
   const removeSelectedFile = () => {
     setSelectedFile(null);
+    setCompressionInfo(null);
     setError('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -155,7 +237,13 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                   {selectedFile.name}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {(selectedFile.size / 1024).toFixed(2)} KB
+                  {FileCompressor.formatBytes(selectedFile.size)}
+                  {compressionInfo && compressionInfo.isCompressed && (
+                    <span className="text-green-600 dark:text-green-400 ml-2">
+                      → {FileCompressor.formatBytes(compressionInfo.compressedSize)} 
+                      ({((compressionInfo.compressedSize / compressionInfo.originalSize) * 100).toFixed(1)}%)
+                    </span>
+                  )}
                 </p>
               </div>
               <button
@@ -166,6 +254,26 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                 <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
+
+            {/* Compression Info */}
+            {compressionInfo && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-green-700 dark:text-green-300 font-medium">
+                    🗜️ File compressed
+                  </span>
+                  <span className="text-green-600 dark:text-green-400">
+                    {FileCompressor.formatBytes(compressionInfo.originalSize)} → {FileCompressor.formatBytes(compressionInfo.compressedSize)}
+                  </span>
+                </div>
+                <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  {compressionInfo.isCompressed ? 
+                    `Reduced by ${(((compressionInfo.originalSize - compressionInfo.compressedSize) / compressionInfo.originalSize) * 100).toFixed(1)}% - Faster upload!` : 
+                    'Image file - No compression applied to maintain quality'
+                  }
+                </div>
+              </div>
+            )}
 
             {/* Document Type Selection */}
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
