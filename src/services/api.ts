@@ -84,40 +84,34 @@ class FileCompressor {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
-
-  static isCompressed(blob: Blob): boolean {
-    return blob.type === 'application/gzip';
-  }
 }
 
-export const uploadDocument = async (file: File, isPermanent: boolean = true) => {
+// FIXED: Updated function signature to match what FileUpload.tsx is calling
+export const uploadDocument = async (
+  fileBlob: Blob, 
+  originalFilename: string, 
+  isCompressed: boolean, 
+  isPermanent: boolean = true
+) => {
   const formData = new FormData();
   
-  // Compress file before upload
-  const compressionResult = await FileCompressor.compressFile(file);
+  // Use appropriate filename
+  const uploadFilename = isCompressed ? `${originalFilename}.gz` : originalFilename;
   
-  // Use original filename but indicate compression
-  const uploadFilename = compressionResult.isCompressed 
-    ? `${file.name}.gz`
-    : file.name;
-
-  formData.append('file', compressionResult.blob, uploadFilename);
-  formData.append('original_filename', file.name); // Keep original name
-  formData.append('is_compressed', compressionResult.isCompressed.toString());
+  formData.append('file', fileBlob, uploadFilename);
+  formData.append('original_filename', originalFilename);
+  formData.append('is_compressed', isCompressed.toString());
   formData.append('is_permanent', isPermanent.toString());
 
   console.log('🔄 Upload details:', {
-    original: file.name,
+    original: originalFilename,
     uploadAs: uploadFilename,
-    compressed: compressionResult.isCompressed,
-    originalSize: FileCompressor.formatBytes(compressionResult.originalSize),
-    compressedSize: FileCompressor.formatBytes(compressionResult.compressedSize),
-    ratio: `${((compressionResult.compressedSize / compressionResult.originalSize) * 100).toFixed(1)}%`
+    compressed: isCompressed,
+    isPermanent: isPermanent
   });
 
   return api.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 30000, // 30 seconds timeout
   });
 };
 
