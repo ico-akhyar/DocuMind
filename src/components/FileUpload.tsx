@@ -129,10 +129,10 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
 
   const handleUpload = async () => {
     if (!selectedFile) return;
-
+  
     setUploading(true);
     setError('');
-
+  
     try {
       console.log('📤 Uploading file with isPermanent:', isPermanent);
       console.log('📤 File will be uploaded as:', isPermanent ? 'PERMANENT' : 'SESSION');
@@ -144,13 +144,9 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
         originalSize: compressionResult.originalSize,
         compressedSize: compressionResult.compressedSize
       });
-
-      const response = await uploadDocument(
-        compressionResult.blob, 
-        selectedFile.name,
-        compressionResult.isCompressed,
-        isPermanent
-      );
+  
+      // FIX: Use the correct API signature - just pass the File and isPermanent
+      const response = await uploadDocument(selectedFile, isPermanent);
       
       console.log('✅ Upload response:', response.data);
       
