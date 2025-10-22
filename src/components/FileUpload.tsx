@@ -8,7 +8,6 @@ interface FileUploadProps {
   onSessionCreated?: (sessionId: string) => void;
 }
 
-// Simple file utilities without compression
 class FileUtils {
   static formatBytes(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
@@ -19,79 +18,6 @@ class FileUtils {
   }
 }
 
-// Custom hook for tracking upload progress
-const useUploadProgress = () => {
-  const [progress, setProgress] = useState(0);
-  const [currentChunk, setCurrentChunk] = useState(0);
-  const [totalChunks, setTotalChunks] = useState(0);
-  const [uploadSpeed, setUploadSpeed] = useState<string>('0 KB/s');
-  const [timeRemaining, setTimeRemaining] = useState<string>('Calculating...');
-  const [uploadedBytes, setUploadedBytes] = useState(0);
-
-  const updateProgress = (chunkIndex: number, totalChunks: number, startTime: number, fileSize: number) => {
-    const currentProgress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
-    setProgress(currentProgress);
-    setCurrentChunk(chunkIndex + 1);
-    setTotalChunks(totalChunks);
-    
-    // Calculate uploaded bytes (approx)
-    const chunkSize = 2 * 1024 * 1024; // 2MB chunks
-    const currentUploadedBytes = Math.min((chunkIndex + 1) * chunkSize, fileSize);
-    setUploadedBytes(currentUploadedBytes);
-
-    // Calculate upload speed
-    const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
-    if (elapsedTime > 0) {
-      const uploadedMB = currentUploadedBytes / (1024 * 1024);
-      const averageSpeed = uploadedMB / elapsedTime;
-      
-      if (averageSpeed < 1) {
-        setUploadSpeed(`${(averageSpeed * 1024).toFixed(1)} KB/s`);
-      } else {
-        setUploadSpeed(`${averageSpeed.toFixed(1)} MB/s`);
-      }
-
-      // Calculate time remaining
-      const bytesRemaining = fileSize - currentUploadedBytes;
-      const bytesPerSecond = currentUploadedBytes / elapsedTime;
-      
-      if (bytesPerSecond > 0) {
-        const secondsRemaining = bytesRemaining / bytesPerSecond;
-        
-        if (secondsRemaining < 60) {
-          setTimeRemaining(`${Math.ceil(secondsRemaining)} seconds`);
-        } else if (secondsRemaining < 3600) {
-          setTimeRemaining(`${Math.ceil(secondsRemaining / 60)} minutes`);
-        } else {
-          setTimeRemaining(`${Math.ceil(secondsRemaining / 3600)} hours`);
-        }
-      } else {
-        setTimeRemaining('Calculating...');
-      }
-    }
-  };
-
-  const resetProgress = () => {
-    setProgress(0);
-    setCurrentChunk(0);
-    setTotalChunks(0);
-    setUploadSpeed('0 KB/s');
-    setTimeRemaining('Calculating...');
-    setUploadedBytes(0);
-  };
-
-  return {
-    progress,
-    currentChunk,
-    totalChunks,
-    uploadSpeed,
-    timeRemaining,
-    uploadedBytes,
-    updateProgress,
-    resetProgress
-  };
-};
-
 export default function FileUpload({ onUploadSuccess, currentSessionId, onSessionCreated }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -100,18 +26,13 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Use the progress tracking hook
-  const {
-    progress,
-    currentChunk,
-    totalChunks,
-    uploadSpeed,
-    timeRemaining,
-    uploadedBytes,
-    updateProgress,
-    resetProgress
-  } = useUploadProgress();
-
+  // Progress states
+  const [progress, setProgress] = useState(0);
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [totalChunks, setTotalChunks] = useState(0);
+  const [uploadSpeed, setUploadSpeed] = useState<string>('0 KB/s');
+  const [timeRemaining, setTimeRemaining] = useState<string>('Calculating...');
+  const [uploadedBytes, setUploadedBytes] = useState(0);
   const [isChunkedUpload, setIsChunkedUpload] = useState<boolean>(false);
   const [uploadStage, setUploadStage] = useState<'uploading' | 'processing' | 'complete'>('uploading');
 
@@ -157,10 +78,17 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setError('');
     setSelectedFile(file);
     resetProgress();
+    setIsChunkedUpload(file.size > 2 * 1024 * 1024);
+  };
+
+  const resetProgress = () => {
+    setProgress(0);
+    setCurrentChunk(0);
+    setTotalChunks(0);
+    setUploadSpeed('0 KB/s');
+    setTimeRemaining('Calculating...');
+    setUploadedBytes(0);
     setUploadStage('uploading');
-    
-    // Determine if chunked upload will be used
-    setIsChunkedUpload(file.size > 5 * 1024 * 1024);
   };
 
   const handleUpload = async () => {
@@ -172,33 +100,32 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setUploadStage('uploading');
   
     try {
-      console.log('📤 Starting upload:', {
-        filename: selectedFile.name,
-        size: FileUtils.formatBytes(selectedFile.size),
-        isPermanent: isPermanent,
-        useChunked: selectedFile.size > 5 * 1024 * 1024
-      });
-
-      const startTime = Date.now();
+      console.log('📤 Starting upload process...');
       
-      // Upload the file - the API will decide whether to use chunked upload
+      const startTime = Date.now();
+      let lastUpdateTime = startTime;
+
+      // Upload with progress tracking
       const response = await uploadDocument(selectedFile, isPermanent);
       
-      console.log('✅ Upload completed successfully:', response.data);
+      console.log('✅ Upload completed successfully');
+      
+      // Show processing stage
+      setUploadStage('processing');
+      setProgress(100);
       
       // If this is a session upload and we got a session ID, notify parent
       if (!isPermanent && response.data.session_id && onSessionCreated) {
         onSessionCreated(response.data.session_id);
       }
       
-      // Show completion
+      // Show completion for 2 seconds
       setUploadStage('complete');
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Show completion for 1.5 seconds
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Reset and cleanup
       setSelectedFile(null);
       resetProgress();
-      setIsChunkedUpload(false);
       onUploadSuccess();
       
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -207,8 +134,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
       console.error('❌ Upload failed:', err);
       const errorMessage = err.response?.data?.detail || err.message || 'Upload failed';
       setError(errorMessage);
-      resetProgress();
-      setUploadStage('uploading');
     } finally {
       setUploading(false);
     }
@@ -218,8 +143,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setSelectedFile(null);
     setError('');
     resetProgress();
-    setUploadStage('uploading');
-    setIsChunkedUpload(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -250,6 +173,16 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
         return '📤';
     }
   };
+
+  // Calculate chunks info
+  const calculateChunkInfo = () => {
+    if (!selectedFile) return { totalChunks: 0, chunkSize: '0 MB' };
+    const chunkSize = 2 * 1024 * 1024; // 2MB
+    const total = Math.ceil(selectedFile.size / chunkSize);
+    return { totalChunks: total, chunkSize: FileUtils.formatBytes(chunkSize) };
+  };
+
+  const chunkInfo = calculateChunkInfo();
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 transition-colors duration-300">
@@ -310,14 +243,14 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {FileUtils.formatBytes(selectedFile.size)}
                 </p>
-                {isChunkedUpload && selectedFile.size > 5 * 1024 * 1024 && (
+                {isChunkedUpload && (
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    📦 Will be uploaded in {Math.ceil(selectedFile.size / (2 * 1024 * 1024))} chunks (2MB each)
+                    📦 Will upload in {chunkInfo.totalChunks} chunks ({chunkInfo.chunkSize} each)
                   </p>
                 )}
-                {selectedFile.size <= 5 * 1024 * 1024 && (
+                {!isChunkedUpload && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                    🚀 Small file - direct upload
+                    🚀 Direct upload
                   </p>
                 )}
               </div>
@@ -346,43 +279,62 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                 </div>
 
                 {/* Progress Bar */}
-                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2.5">
+                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-3">
                   <div 
-                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${progress}%` }}
                   ></div>
                 </div>
 
-                {/* Progress Stats */}
-                <div className="grid grid-cols-2 gap-4 text-xs text-blue-600 dark:text-blue-400">
+                {/* Detailed Progress Info */}
+                <div className="grid grid-cols-3 gap-2 text-xs">
                   <div className="text-center">
-                    <div className="font-medium">
+                    <div className="font-semibold text-blue-700 dark:text-blue-300">
+                      {uploadStage === 'uploading' && isChunkedUpload 
+                        ? `Chunk ${currentChunk}/${totalChunks}`
+                        : `${progress}%`
+                      }
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400">Progress</div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="font-semibold text-blue-700 dark:text-blue-300">
                       {FileUtils.formatBytes(uploadedBytes)} / {FileUtils.formatBytes(selectedFile.size)}
                     </div>
-                    <div className="text-blue-500 dark:text-blue-300">Uploaded</div>
+                    <div className="text-blue-600 dark:text-blue-400">Uploaded</div>
                   </div>
+                  
                   <div className="text-center">
-                    <div className="font-medium">{uploadSpeed}</div>
-                    <div className="text-blue-500 dark:text-blue-300">Speed</div>
+                    <div className="font-semibold text-blue-700 dark:text-blue-300">
+                      {uploadSpeed}
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400">Speed</div>
                   </div>
                 </div>
 
-                {isChunkedUpload && (
+                {/* Stage-specific messages */}
+                {uploadStage === 'uploading' && isChunkedUpload && (
                   <div className="text-center text-xs text-blue-600 dark:text-blue-400">
-                    Chunk {currentChunk} of {totalChunks} • {timeRemaining} remaining
+                    {timeRemaining !== 'Calculating...' && `⏱️ ${timeRemaining} remaining`}
+                  </div>
+                )}
+                
+                {uploadStage === 'processing' && (
+                  <div className="text-center text-xs text-blue-600 dark:text-blue-400">
+                    ⚙️ Extracting text and generating embeddings...
                   </div>
                 )}
 
-                {/* Connection info for slow speeds */}
-                {uploadSpeed.includes('KB/s') && (
-                  <div className="text-center text-xs text-amber-600 dark:text-amber-400">
-                    ⚡ Tip: For faster uploads, try using a better network connection
+                {uploadStage === 'complete' && (
+                  <div className="text-center text-xs text-green-600 dark:text-green-400">
+                    ✅ Upload completed successfully!
                   </div>
                 )}
               </div>
             )}
 
-            {/* Document Type Selection */}
+            {/* Document Type Selection - Only show when not uploading */}
             {!uploading && (
               <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
@@ -396,7 +348,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                       checked={isPermanent}
                       onChange={() => setIsPermanent(true)}
                       className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                      disabled={uploading}
                     />
                     <div className="flex-1">
                       <span className="font-medium text-gray-900 dark:text-white">Permanent</span>
@@ -413,7 +364,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                       checked={!isPermanent}
                       onChange={() => setIsPermanent(false)}
                       className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                      disabled={uploading}
                     />
                     <div className="flex-1">
                       <span className="font-medium text-gray-900 dark:text-white">Session Only</span>
@@ -426,12 +376,11 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
               </div>
             )}
 
-            {/* Upload Button */}
+            {/* Upload Button - Only show when not uploading */}
             {!uploading && (
               <button
                 onClick={handleUpload}
-                disabled={uploading}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 disabled:transform-none"
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-all duration-200 transform hover:scale-105"
               >
                 {`Upload as ${isPermanent ? 'Permanent' : 'Session'} Document`}
               </button>
@@ -446,6 +395,11 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
           {error.includes('timeout') && (
             <p className="text-xs text-red-500 dark:text-red-300 mt-1">
               💡 Try uploading a smaller file or check your internet connection
+            </p>
+          )}
+          {error.includes('session expired') && (
+            <p className="text-xs text-red-500 dark:text-red-300 mt-1">
+              🔄 Please try uploading the file again
             </p>
           )}
         </div>
