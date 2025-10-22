@@ -25,14 +25,14 @@ class FileCompressor {
       };
     }
 
-    console.log('🗜️ Compressing file:', file.name);
+    console.log('🗜️ Compressing file with Brotli:', file.name);
     
     try {
       // Read file content
       const arrayBuffer = await file.arrayBuffer();
       
-      // Create gzip compressed blob
-      const compressedStream = new CompressionStream('gzip');
+      // Use Brotli compression (much better than gzip)
+      const compressedStream = new CompressionStream('br'); // 'br' for Brotli
       const writer = compressedStream.writable.getWriter();
       writer.write(new Uint8Array(arrayBuffer));
       writer.close();
@@ -46,15 +46,16 @@ class FileCompressor {
         compressedSize: compressedBlob.size
       };
       
-      console.log('✅ Compression complete:', {
+      console.log('✅ Brotli compression complete:', {
         original: this.formatBytes(file.size),
         compressed: this.formatBytes(compressedBlob.size),
-        ratio: `${((compressedBlob.size / file.size) * 100).toFixed(1)}%`
+        ratio: `${((compressedBlob.size / file.size) * 100).toFixed(1)}%`,
+        reduction: `${((1 - (compressedBlob.size / file.size)) * 100).toFixed(1)}% reduction`
       });
       
       return compressionInfo;
     } catch (error) {
-      console.error('❌ Compression failed, using original file:', error);
+      console.error('❌ Brotli compression failed, using original file:', error);
       return {
         blob: file,
         isCompressed: false,
