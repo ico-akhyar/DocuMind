@@ -21,104 +21,8 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Enhanced Compression utility with Smart Fallback
-class FileCompressor {
-  static async compressFile(file: File): Promise<{ 
-    blob: Blob; 
-    isCompressed: boolean; 
-    originalSize: number; 
-    compressedSize: number;
-    compressionType: 'brotli' | 'gzip' | 'none';
-  }> {
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    const isImage = ['jpg', 'jpeg', '.png', '.gif', '.bmp', '.webp'].includes(fileExtension || '');
-    
-    // Skip compression for images to maintain OCR quality
-    if (isImage) {
-      console.log('🖼️ Skipping compression for image file');
-      return {
-        blob: file,
-        isCompressed: false,
-        originalSize: file.size,
-        compressedSize: file.size,
-        compressionType: 'none'
-      };
-    }
-
-    console.log('🗜️ Attempting file compression:', file.name);
-    
-    // Try Brotli first (better compression)
-    try {
-      console.log('🔄 Trying Brotli compression...');
-      const arrayBuffer = await file.arrayBuffer();
-      
-      const compressedStream = new CompressionStream('br');
-      const writer = compressedStream.writable.getWriter();
-      writer.write(new Uint8Array(arrayBuffer));
-      writer.close();
-      
-      const compressedBlob = await new Response(compressedStream.readable).blob();
-      
-      const compressionInfo = {
-        blob: compressedBlob,
-        isCompressed: true,
-        originalSize: file.size,
-        compressedSize: compressedBlob.size,
-        compressionType: 'brotli' as const
-      };
-      
-      console.log('✅ Brotli compression successful:', {
-        original: this.formatBytes(file.size),
-        compressed: this.formatBytes(compressedBlob.size),
-        ratio: `${((compressedBlob.size / file.size) * 100).toFixed(1)}%`,
-        reduction: `${((1 - (compressedBlob.size / file.size)) * 100).toFixed(1)}% reduction`
-      });
-      
-      return compressionInfo;
-    } catch (brotliError) {
-      console.log('🔄 Brotli not supported, falling back to gzip...');
-      
-      // Fallback to gzip compression
-      try {
-        console.log('🔄 Trying Gzip compression...');
-        const arrayBuffer = await file.arrayBuffer();
-        
-        const compressedStream = new CompressionStream('gzip');
-        const writer = compressedStream.writable.getWriter();
-        writer.write(new Uint8Array(arrayBuffer));
-        writer.close();
-        
-        const compressedBlob = await new Response(compressedStream.readable).blob();
-        
-        const compressionInfo = {
-          blob: compressedBlob,
-          isCompressed: true,
-          originalSize: file.size,
-          compressedSize: compressedBlob.size,
-          compressionType: 'gzip' as const
-        };
-        
-        console.log('✅ Gzip compression successful:', {
-          original: this.formatBytes(file.size),
-          compressed: this.formatBytes(compressedBlob.size),
-          ratio: `${((compressedBlob.size / file.size) * 100).toFixed(1)}%`,
-          reduction: `${((1 - (compressedBlob.size / file.size)) * 100).toFixed(1)}% reduction`
-        });
-        
-        return compressionInfo;
-      } catch (gzipError) {
-        console.error('❌ Both Brotli and Gzip compression failed, using original file');
-        return {
-          blob: file,
-          isCompressed: false,
-          originalSize: file.size,
-          compressedSize: file.size,
-          compressionType: 'none'
-        };
-      }
-    }
-  }
-
+// Simple file utilities without compression
+class FileUtils {
   static formatBytes(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -126,126 +30,114 @@ class FileCompressor {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
-
-  // Check browser compression support
-  static checkCompressionSupport(): { brotli: boolean; gzip: boolean } {
-    try {
-      new CompressionStream('br');
-      return { brotli: true, gzip: true };
-    } catch {
-      try {
-        new CompressionStream('gzip');
-        return { brotli: false, gzip: true };
-      } catch {
-        return { brotli: false, gzip: false };
-      }
-    }
-  }
 }
 
 // Chunked upload function for large files
-export const uploadDocumentChunked = async (file: File, isPermanent: boolean = true) => {
-  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+export const uploadDocumentChunked = async (
+  file: File, 
+  isPermanent: boolean = true, 
+  onProgress?: (chunkIndex: number, totalChunks: number) => void
+) => {
+  const CHUNK_SIZE = 2 * 1024 * 1024; // Reduced to 2MB for better reliability
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
   
-  console.log(`📦 Starting chunked upload: ${file.name}, ${totalChunks} chunks`);
+  console.log(`📦 Starting chunked upload: ${file.name}, ${totalChunks} chunks (${CHUNK_SIZE/1024/1024}MB each)`);
 
-  // Start upload session
-  const startResponse = await api.post('/upload/start', {
-    original_filename: file.name,
-    total_size: file.size,
-    is_permanent: isPermanent.toString()
-  }, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
+  try {
+    // Start upload session
+    const startFormData = new FormData();
+    startFormData.append('original_filename', file.name);
+    startFormData.append('total_size', file.size.toString());
+    startFormData.append('is_permanent', isPermanent.toString());
 
-  const { upload_id } = startResponse.data;
+    const startResponse = await api.post('/upload/start', startFormData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000
+    });
 
-  // Upload chunks sequentially
-  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-    const start = chunkIndex * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
-    
-    const formData = new FormData();
-    formData.append('upload_id', upload_id);
-    formData.append('chunk_index', chunkIndex.toString());
-    formData.append('total_chunks', totalChunks.toString());
-    formData.append('chunk', chunk);
+    const { upload_id } = startResponse.data;
+    console.log(`🆕 Upload session started: ${upload_id}`);
 
-    try {
-      await api.post('/upload/chunk', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 60000 // 1 minute per chunk
-      });
+    // Upload chunks sequentially
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+      const start = chunkIndex * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, file.size);
+      const chunk = file.slice(start, end);
       
-      console.log(`✅ Uploaded chunk ${chunkIndex + 1}/${totalChunks}`);
-    } catch (error) {
-      console.error(`❌ Failed to upload chunk ${chunkIndex + 1}:`, error);
-      throw new Error(`Failed to upload chunk ${chunkIndex + 1}`);
+      const chunkFormData = new FormData();
+      chunkFormData.append('upload_id', upload_id);
+      chunkFormData.append('chunk_index', chunkIndex.toString());
+      chunkFormData.append('total_chunks', totalChunks.toString());
+      chunkFormData.append('chunk', chunk, `chunk-${chunkIndex}`);
+
+      try {
+        await api.post('/upload/chunk', chunkFormData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 45000 // 45 seconds per chunk
+        });
+        
+        console.log(`✅ Uploaded chunk ${chunkIndex + 1}/${totalChunks}`);
+        
+        // Call progress callback if provided
+        if (onProgress) {
+          onProgress(chunkIndex, totalChunks);
+        }
+      } catch (error) {
+        console.error(`❌ Failed to upload chunk ${chunkIndex + 1}:`, error);
+        throw new Error(`Failed to upload chunk ${chunkIndex + 1}: ${error}`);
+      }
     }
+
+    // Complete upload
+    const completeFormData = new FormData();
+    completeFormData.append('upload_id', upload_id);
+    completeFormData.append('original_filename', file.name);
+    completeFormData.append('is_compressed', 'false');
+    completeFormData.append('is_compression_type', 'none');
+
+    console.log(`🎯 Completing upload: ${upload_id}`);
+    const response = await api.post('/upload/complete', completeFormData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000
+    });
+
+    console.log('✅ Chunked upload completed successfully');
+    return response;
+
+  } catch (error) {
+    console.error('❌ Chunked upload failed:', error);
+    throw error;
   }
-
-  // Complete upload
-  const formData = new FormData();
-  formData.append('upload_id', upload_id);
-  formData.append('original_filename', file.name);
-  formData.append('is_compressed', 'false');
-  formData.append('is_compression_type', 'none');
-
-  return api.post('/upload/complete', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
 };
 
-// Original upload function for small files
+// Original upload function for small files - NO COMPRESSION
 export const uploadDocument = async (file: File, isPermanent: boolean = true) => {
-  // Use chunked upload for files larger than 10MB
-  if (file.size > 10 * 1024 * 1024) {
-    console.log('📦 Using chunked upload for large file');
+  // Use chunked upload for files larger than 5MB
+  if (file.size > 5 * 1024 * 1024) {
+    console.log('📦 Using chunked upload for file > 5MB');
     return uploadDocumentChunked(file, isPermanent);
   }
 
-  // Use regular upload for small files
+  // Use regular upload for small files - NO COMPRESSION
   const formData = new FormData();
   
-  // Check browser compression support
-  const support = FileCompressor.checkCompressionSupport();
-  console.log('🔍 Browser compression support:', support);
-  
-  // Compress file before upload
-  const compressionResult = await FileCompressor.compressFile(file);
-  
-  // Use appropriate filename based on compression type
-  let uploadFilename = file.name;
-  if (compressionResult.isCompressed) {
-    if (compressionResult.compressionType === 'brotli') {
-      uploadFilename = `${file.name}.br`;
-    } else if (compressionResult.compressionType === 'gzip') {
-      uploadFilename = `${file.name}.gz`;
-    }
-  }
-
-  formData.append('file', compressionResult.blob, uploadFilename);
+  // Direct file upload without compression
+  formData.append('file', file);
   formData.append('original_filename', file.name);
-  formData.append('is_compressed', compressionResult.isCompressed.toString());
-  formData.append('is_compression_type', compressionResult.compressionType);
+  formData.append('is_compressed', 'false');
+  formData.append('is_compression_type', 'none');
   formData.append('is_permanent', isPermanent.toString());
 
   console.log('🔄 Upload details:', {
     original: file.name,
-    uploadAs: uploadFilename,
-    compressed: compressionResult.isCompressed,
-    compressionType: compressionResult.compressionType,
-    originalSize: FileCompressor.formatBytes(compressionResult.originalSize),
-    compressedSize: FileCompressor.formatBytes(compressionResult.compressedSize),
-    ratio: `${((compressionResult.compressedSize / compressionResult.originalSize) * 100).toFixed(1)}%`,
-    reduction: `${((1 - (compressionResult.compressedSize / compressionResult.originalSize)) * 100).toFixed(1)}% reduction`,
-    browserSupport: support
+    size: FileUtils.formatBytes(file.size),
+    compressed: false,
+    type: 'direct_upload'
   });
 
   return api.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000 // 1 minute for small files
   });
 };
 
@@ -269,71 +161,6 @@ export const getDocuments = async () => {
 
 export const deleteDocument = async (filename: string) => {
   return api.delete(`/documents/${filename}`);
-};
-
-// Add this to your api.ts - updated uploadDocumentChunked function
-export const uploadDocumentChunked = async (
-  file: File, 
-  isPermanent: boolean = true, 
-  onProgress?: (chunkIndex: number) => void
-) => {
-  const CHUNK_SIZE = 5 * 1024 * 1024;
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-  
-  console.log(`📦 Starting chunked upload: ${file.name}, ${totalChunks} chunks`);
-
-  // Start upload session
-  const startFormData = new FormData();
-  startFormData.append('original_filename', file.name);
-  startFormData.append('total_size', file.size.toString());
-  startFormData.append('is_permanent', isPermanent.toString());
-
-  const startResponse = await api.post('/upload/start', startFormData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
-
-  const { upload_id } = startResponse.data;
-
-  // Upload chunks sequentially
-  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-    const start = chunkIndex * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
-    
-    const chunkFormData = new FormData();
-    chunkFormData.append('upload_id', upload_id);
-    chunkFormData.append('chunk_index', chunkIndex.toString());
-    chunkFormData.append('total_chunks', totalChunks.toString());
-    chunkFormData.append('chunk', chunk);
-
-    try {
-      await api.post('/upload/chunk', chunkFormData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 60000
-      });
-      
-      console.log(`✅ Uploaded chunk ${chunkIndex + 1}/${totalChunks}`);
-      
-      // Call progress callback if provided
-      if (onProgress) {
-        onProgress(chunkIndex);
-      }
-    } catch (error) {
-      console.error(`❌ Failed to upload chunk ${chunkIndex + 1}:`, error);
-      throw new Error(`Failed to upload chunk ${chunkIndex + 1}`);
-    }
-  }
-
-  // Complete upload
-  const completeFormData = new FormData();
-  completeFormData.append('upload_id', upload_id);
-  completeFormData.append('original_filename', file.name);
-  completeFormData.append('is_compressed', 'false');
-  completeFormData.append('is_compression_type', 'none');
-
-  return api.post('/upload/complete', completeFormData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
 };
 
 export default api;

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Upload, File, X } from 'lucide-react';
-import { uploadDocument, uploadDocumentChunked } from '../services/api';
+import { uploadDocument } from '../services/api';
 
 interface FileUploadProps {
   onUploadSuccess: () => void;
@@ -8,63 +8,8 @@ interface FileUploadProps {
   onSessionCreated?: (sessionId: string) => void;
 }
 
-// Compression utility
-class FileCompressor {
-  static async compressFile(file: File): Promise<{ blob: Blob; isCompressed: boolean; originalSize: number; compressedSize: number }> {
-    const fileExtension = file.name.split('.').pop()?.toLowerCase();
-    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExtension || '');
-    
-    // Skip compression for images to maintain OCR quality
-    if (isImage) {
-      console.log('🖼️ Skipping compression for image file');
-      return {
-        blob: file,
-        isCompressed: false,
-        originalSize: file.size,
-        compressedSize: file.size
-      };
-    }
-
-    console.log('🗜️ Compressing file with Brotli:', file.name);
-    
-    try {
-      // Read file content
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Use Brotli compression (much better than gzip)
-      const compressedStream = new CompressionStream('br'); // 'br' for Brotli
-      const writer = compressedStream.writable.getWriter();
-      writer.write(new Uint8Array(arrayBuffer));
-      writer.close();
-      
-      const compressedBlob = await new Response(compressedStream.readable).blob();
-      
-      const compressionInfo = {
-        blob: compressedBlob,
-        isCompressed: true,
-        originalSize: file.size,
-        compressedSize: compressedBlob.size
-      };
-      
-      console.log('✅ Brotli compression complete:', {
-        original: this.formatBytes(file.size),
-        compressed: this.formatBytes(compressedBlob.size),
-        ratio: `${((compressedBlob.size / file.size) * 100).toFixed(1)}%`,
-        reduction: `${((1 - (compressedBlob.size / file.size)) * 100).toFixed(1)}% reduction`
-      });
-      
-      return compressionInfo;
-    } catch (error) {
-      console.error('❌ Brotli compression failed, using original file:', error);
-      return {
-        blob: file,
-        isCompressed: false,
-        originalSize: file.size,
-        compressedSize: file.size
-      };
-    }
-  }
-
+// Simple file utilities without compression
+class FileUtils {
   static formatBytes(bytes: number): string {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -81,27 +26,47 @@ const useUploadProgress = () => {
   const [totalChunks, setTotalChunks] = useState(0);
   const [uploadSpeed, setUploadSpeed] = useState<string>('0 KB/s');
   const [timeRemaining, setTimeRemaining] = useState<string>('Calculating...');
+  const [uploadedBytes, setUploadedBytes] = useState(0);
 
-  const updateProgress = (chunkIndex: number, totalChunks: number, startTime: number) => {
+  const updateProgress = (chunkIndex: number, totalChunks: number, startTime: number, fileSize: number) => {
     const currentProgress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
     setProgress(currentProgress);
     setCurrentChunk(chunkIndex + 1);
     setTotalChunks(totalChunks);
+    
+    // Calculate uploaded bytes (approx)
+    const chunkSize = 2 * 1024 * 1024; // 2MB chunks
+    const currentUploadedBytes = Math.min((chunkIndex + 1) * chunkSize, fileSize);
+    setUploadedBytes(currentUploadedBytes);
 
     // Calculate upload speed
     const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
     if (elapsedTime > 0) {
-      const averageSpeed = (chunkIndex + 1) * 5 / elapsedTime; // 5MB per chunk
-      setUploadSpeed(`${averageSpeed.toFixed(1)} MB/s`);
+      const uploadedMB = currentUploadedBytes / (1024 * 1024);
+      const averageSpeed = uploadedMB / elapsedTime;
+      
+      if (averageSpeed < 1) {
+        setUploadSpeed(`${(averageSpeed * 1024).toFixed(1)} KB/s`);
+      } else {
+        setUploadSpeed(`${averageSpeed.toFixed(1)} MB/s`);
+      }
 
       // Calculate time remaining
-      const chunksRemaining = totalChunks - (chunkIndex + 1);
-      const estimatedTimeRemaining = (chunksRemaining * 5) / averageSpeed; // in seconds
+      const bytesRemaining = fileSize - currentUploadedBytes;
+      const bytesPerSecond = currentUploadedBytes / elapsedTime;
       
-      if (estimatedTimeRemaining < 60) {
-        setTimeRemaining(`${Math.ceil(estimatedTimeRemaining)} seconds`);
+      if (bytesPerSecond > 0) {
+        const secondsRemaining = bytesRemaining / bytesPerSecond;
+        
+        if (secondsRemaining < 60) {
+          setTimeRemaining(`${Math.ceil(secondsRemaining)} seconds`);
+        } else if (secondsRemaining < 3600) {
+          setTimeRemaining(`${Math.ceil(secondsRemaining / 60)} minutes`);
+        } else {
+          setTimeRemaining(`${Math.ceil(secondsRemaining / 3600)} hours`);
+        }
       } else {
-        setTimeRemaining(`${Math.ceil(estimatedTimeRemaining / 60)} minutes`);
+        setTimeRemaining('Calculating...');
       }
     }
   };
@@ -112,6 +77,7 @@ const useUploadProgress = () => {
     setTotalChunks(0);
     setUploadSpeed('0 KB/s');
     setTimeRemaining('Calculating...');
+    setUploadedBytes(0);
   };
 
   return {
@@ -120,6 +86,7 @@ const useUploadProgress = () => {
     totalChunks,
     uploadSpeed,
     timeRemaining,
+    uploadedBytes,
     updateProgress,
     resetProgress
   };
@@ -131,7 +98,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const [uploading, setUploading] = useState(false);
   const [isPermanent, setIsPermanent] = useState(true);
   const [error, setError] = useState('');
-  const [compressionInfo, setCompressionInfo] = useState<{isCompressed: boolean; originalSize: number; compressedSize: number} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Use the progress tracking hook
@@ -141,6 +107,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     totalChunks,
     uploadSpeed,
     timeRemaining,
+    uploadedBytes,
     updateProgress,
     resetProgress
   } = useUploadProgress();
@@ -182,16 +149,18 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
       return;
     }
 
-    if (file.size > 200 * 1024 * 1024) { // Increased to 200MB for chunked uploads
+    if (file.size > 200 * 1024 * 1024) {
       setError('File size must be less than 200MB');
       return;
     }
 
     setError('');
     setSelectedFile(file);
-    setCompressionInfo(null);
     resetProgress();
     setUploadStage('uploading');
+    
+    // Determine if chunked upload will be used
+    setIsChunkedUpload(file.size > 5 * 1024 * 1024);
   };
 
   const handleUpload = async () => {
@@ -200,85 +169,45 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setUploading(true);
     setError('');
     resetProgress();
-    setIsChunkedUpload(selectedFile.size > 10 * 1024 * 1024);
     setUploadStage('uploading');
   
     try {
-      console.log('📤 Uploading file with isPermanent:', isPermanent);
-      console.log('📤 File will be uploaded as:', isPermanent ? 'PERMANENT' : 'SESSION');
-      
-      let response;
+      console.log('📤 Starting upload:', {
+        filename: selectedFile.name,
+        size: FileUtils.formatBytes(selectedFile.size),
+        isPermanent: isPermanent,
+        useChunked: selectedFile.size > 5 * 1024 * 1024
+      });
+
       const startTime = Date.now();
-
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        // Use chunked upload for large files
-        console.log('📦 Using chunked upload for large file');
-        
-        // Enhanced chunked upload with progress tracking
-        const CHUNK_SIZE = 5 * 1024 * 1024;
-        const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
-        
-        // Start upload session
-        const startResponse = await uploadDocumentChunked(selectedFile, isPermanent, 
-          (chunkIndex: number) => {
-            updateProgress(chunkIndex, totalChunks, startTime);
-          }
-        );
-        
-        response = startResponse;
-      } else {
-        // Use regular upload for small files with compression
-        console.log('📤 Using regular upload for small file');
-        
-        // Compress file before upload (small files only)
-        const compressionResult = await FileCompressor.compressFile(selectedFile);
-        setCompressionInfo({
-          isCompressed: compressionResult.isCompressed,
-          originalSize: compressionResult.originalSize,
-          compressedSize: compressionResult.compressedSize
-        });
-
-        // Simulate progress for small files
-        for (let i = 0; i <= 100; i += 20) {
-          updateProgress(i / 20, 5, startTime);
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
-        
-        response = await uploadDocument(selectedFile, isPermanent);
-      }
-
-      // Move to processing stage
-      setUploadStage('processing');
-      resetProgress();
       
-      console.log('✅ Upload response:', response.data);
+      // Upload the file - the API will decide whether to use chunked upload
+      const response = await uploadDocument(selectedFile, isPermanent);
+      
+      console.log('✅ Upload completed successfully:', response.data);
       
       // If this is a session upload and we got a session ID, notify parent
       if (!isPermanent && response.data.session_id && onSessionCreated) {
         onSessionCreated(response.data.session_id);
       }
       
-      // Simulate processing stage
-      for (let i = 0; i <= 100; i += 10) {
-        updateProgress(i / 10, 10, Date.now());
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-      
+      // Show completion
       setUploadStage('complete');
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Show completion for 1 second
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Show completion for 1.5 seconds
       
+      // Reset and cleanup
       setSelectedFile(null);
-      setCompressionInfo(null);
       resetProgress();
       setIsChunkedUpload(false);
       onUploadSuccess();
       
       if (fileInputRef.current) fileInputRef.current.value = '';
+      
     } catch (err: any) {
-      console.error('Upload error:', err);
-      setError(err.response?.data?.detail || err.message || 'Upload failed');
+      console.error('❌ Upload failed:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Upload failed';
+      setError(errorMessage);
       resetProgress();
-      setIsChunkedUpload(false);
       setUploadStage('uploading');
     } finally {
       setUploading(false);
@@ -287,10 +216,10 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
 
   const removeSelectedFile = () => {
     setSelectedFile(null);
-    setCompressionInfo(null);
     setError('');
     resetProgress();
     setUploadStage('uploading');
+    setIsChunkedUpload(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -379,17 +308,16 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                   {selectedFile.name}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {FileCompressor.formatBytes(selectedFile.size)}
-                  {compressionInfo && (
-                    <span className="text-green-600 dark:text-green-400 ml-2">
-                      → {FileCompressor.formatBytes(compressionInfo.compressedSize)} 
-                      ({((compressionInfo.compressedSize / compressionInfo.originalSize) * 100).toFixed(1)}%)
-                    </span>
-                  )}
+                  {FileUtils.formatBytes(selectedFile.size)}
                 </p>
-                {isChunkedUpload && (
+                {isChunkedUpload && selectedFile.size > 5 * 1024 * 1024 && (
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                    📦 Will be uploaded in {Math.ceil(selectedFile.size / (5 * 1024 * 1024))} chunks
+                    📦 Will be uploaded in {Math.ceil(selectedFile.size / (2 * 1024 * 1024))} chunks (2MB each)
+                  </p>
+                )}
+                {selectedFile.size <= 5 * 1024 * 1024 && (
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                    🚀 Small file - direct upload
                   </p>
                 )}
               </div>
@@ -401,26 +329,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                 <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
-
-            {/* Compression Info */}
-            {compressionInfo && (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-green-700 dark:text-green-300 font-medium">
-                    🗜️ File compressed
-                  </span>
-                  <span className="text-green-600 dark:text-green-400">
-                    {FileCompressor.formatBytes(compressionInfo.originalSize)} → {FileCompressor.formatBytes(compressionInfo.compressedSize)}
-                  </span>
-                </div>
-                <div className="text-xs text-green-600 dark:text-green-400 mt-1">
-                  {compressionInfo.isCompressed ? 
-                    `Reduced by ${(((compressionInfo.originalSize - compressionInfo.compressedSize) / compressionInfo.originalSize) * 100).toFixed(1)}% - Faster upload!` : 
-                    'No compression applied'
-                  }
-                </div>
-              </div>
-            )}
 
             {/* Upload Progress */}
             {uploading && (
@@ -446,30 +354,29 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                 </div>
 
                 {/* Progress Stats */}
-                <div className="grid grid-cols-3 gap-4 text-xs text-blue-600 dark:text-blue-400">
+                <div className="grid grid-cols-2 gap-4 text-xs text-blue-600 dark:text-blue-400">
                   <div className="text-center">
                     <div className="font-medium">
-                      {isChunkedUpload && uploadStage === 'uploading' 
-                        ? `${currentChunk}/${totalChunks} chunks` 
-                        : `${progress}%`
-                      }
+                      {FileUtils.formatBytes(uploadedBytes)} / {FileUtils.formatBytes(selectedFile.size)}
                     </div>
-                    <div className="text-blue-500 dark:text-blue-300">Progress</div>
+                    <div className="text-blue-500 dark:text-blue-300">Uploaded</div>
                   </div>
                   <div className="text-center">
                     <div className="font-medium">{uploadSpeed}</div>
                     <div className="text-blue-500 dark:text-blue-300">Speed</div>
                   </div>
-                  <div className="text-center">
-                    <div className="font-medium">{timeRemaining}</div>
-                    <div className="text-blue-500 dark:text-blue-300">Remaining</div>
-                  </div>
                 </div>
 
-                {/* Stage-specific info */}
-                {uploadStage === 'processing' && (
-                  <div className="text-xs text-blue-600 dark:text-blue-400 text-center">
-                    ⚙️ Extracting text and generating embeddings...
+                {isChunkedUpload && (
+                  <div className="text-center text-xs text-blue-600 dark:text-blue-400">
+                    Chunk {currentChunk} of {totalChunks} • {timeRemaining} remaining
+                  </div>
+                )}
+
+                {/* Connection info for slow speeds */}
+                {uploadSpeed.includes('KB/s') && (
+                  <div className="text-center text-xs text-amber-600 dark:text-amber-400">
+                    ⚡ Tip: For faster uploads, try using a better network connection
                   </div>
                 )}
               </div>
@@ -516,14 +423,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                     </div>
                   </label>
                 </div>
-                
-                {/* Debug Info */}
-                <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-600 dark:text-blue-400">
-                  📝 Will upload as: <strong>{isPermanent ? 'PERMANENT' : 'SESSION'}</strong>
-                  {currentSessionId && !isPermanent && (
-                    <div>Using existing session: {currentSessionId}</div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -544,6 +443,11 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
       {error && (
         <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          {error.includes('timeout') && (
+            <p className="text-xs text-red-500 dark:text-red-300 mt-1">
+              💡 Try uploading a smaller file or check your internet connection
+            </p>
+          )}
         </div>
       )}
     </div>
