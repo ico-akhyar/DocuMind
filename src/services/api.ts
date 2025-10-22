@@ -34,7 +34,7 @@ const uploadChunked = async (file: File, isPermanent: boolean, onProgress?: (pro
   console.log(`📦 Using chunked upload for large file: ${file.name} (${file.size} bytes)`);
   
   // Step 1: Start upload session
-  const startResponse = await api.post('/upload/start', {
+  const startResponse = await api.post('/upload', {
     filename: file.name,
     file_size: file.size,
     total_chunks: Math.ceil(file.size / CHUNK_SIZE),
