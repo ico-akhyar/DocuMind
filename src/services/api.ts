@@ -134,8 +134,5 @@ export const deleteDocument = async (filename: string) => {
   return api.delete(`/documents/${filename}`);
 };
 
-export const getUploadStatus = async (documentId: number) => {
-  return api.get(`/upload/status/${documentId}`);
-};
 
 export default api;
