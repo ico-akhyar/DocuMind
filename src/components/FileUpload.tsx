@@ -1,4 +1,3 @@
-// FileUpload.tsx
 import { useState, useRef } from 'react';
 import { Upload, File, X } from 'lucide-react';
 import { uploadDocument } from '../services/api';
@@ -16,8 +15,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const [isPermanent, setIsPermanent] = useState(true);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadStage, setUploadStage] = useState<'preparing' | 'uploading' | 'processing' | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -67,20 +64,11 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   
     setUploading(true);
     setError('');
-    setUploadProgress(0);
-    setUploadStage('preparing');
   
     try {
       console.log('📤 Uploading file with isPermanent:', isPermanent);
       
-      const response = await uploadDocument(
-        selectedFile, 
-        isPermanent, 
-        (progress) => {
-          setUploadProgress(progress);
-          setUploadStage(progress < 100 ? 'uploading' : 'processing');
-        }
-      );
+      const response = await uploadDocument(selectedFile, isPermanent);
       
       console.log('✅ Upload response:', response.data);
       
@@ -92,24 +80,17 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
         }
         
         setSelectedFile(null);
-        setUploadProgress(100);
-        setUploadStage('processing');
         onUploadSuccess();
         
         if (fileInputRef.current) fileInputRef.current.value = '';
         
-        // Reset progress after success
-        setTimeout(() => {
-          setUploadProgress(0);
-          setUploadStage(null);
-        }, 2000);
+        // Show success message
+        setError(''); // Clear any errors
       }
       
     } catch (err: any) {
       console.error('Upload error:', err);
       setError(err.response?.data?.detail || err.message || 'Upload failed');
-      setUploadProgress(0);
-      setUploadStage(null);
     } finally {
       setUploading(false);
     }
@@ -118,16 +99,9 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const removeSelectedFile = () => {
     setSelectedFile(null);
     setError('');
-    setUploadProgress(0);
-    setUploadStage(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  };
-
-  const getUploadMethod = () => {
-    if (!selectedFile) return '';
-    return selectedFile.size > 5 * 1024 * 1024 ? 'Chunked Upload' : 'Direct Upload';
   };
 
   return (
@@ -187,10 +161,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                   {selectedFile.name}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  Method: {getUploadMethod()}
+                  {(selectedFile.size / 1024).toFixed(2)} KB
                 </p>
               </div>
               <button
@@ -252,32 +223,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
               </div>
             </div>
 
-            {/* Progress Bar */}
-            {uploadStage && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                  <span>
-                    {uploadStage === 'preparing' && 'Preparing upload...'}
-                    {uploadStage === 'uploading' && 'Uploading file...'}
-                    {uploadStage === 'processing' && 'Processing document...'}
-                  </span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                  <div 
-                    className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${uploadProgress}%` }}
-                  ></div>
-                </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                  {selectedFile.size > 5 * 1024 * 1024 
-                    ? 'Using chunked upload for large file...' 
-                    : 'Using direct upload...'
-                  }
-                </p>
-              </div>
-            )}
-
             {/* Upload Button */}
             <button
               onClick={handleUpload}
@@ -287,7 +232,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
               {uploading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  {uploadProgress < 100 ? 'Uploading...' : 'Processing...'}
+                  Uploading...
                 </div>
               ) : (
                 `Upload as ${isPermanent ? 'Permanent' : 'Session'} Document`
@@ -303,11 +248,11 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
         </div>
       )}
 
-      {/* Upload Info */}
-      {!selectedFile && (
+      {/* Upload Status */}
+      {uploading && (
         <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm text-blue-600 dark:text-blue-400 text-center">
-            💡 Files larger than 5MB will automatically use chunked upload to avoid timeout issues.
+            ⏳ Uploading and processing document... This may take a moment.
           </p>
         </div>
       )}
