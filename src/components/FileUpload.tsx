@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Upload, File, X } from 'lucide-react';
-import { uploadDocument } from '../services/api';
+import { uploadDocument, uploadDocumentChunked } from '../services/api';
 
 interface FileUploadProps {
   onUploadSuccess: () => void;
@@ -74,6 +74,57 @@ class FileCompressor {
   }
 }
 
+// Custom hook for tracking upload progress
+const useUploadProgress = () => {
+  const [progress, setProgress] = useState(0);
+  const [currentChunk, setCurrentChunk] = useState(0);
+  const [totalChunks, setTotalChunks] = useState(0);
+  const [uploadSpeed, setUploadSpeed] = useState<string>('0 KB/s');
+  const [timeRemaining, setTimeRemaining] = useState<string>('Calculating...');
+
+  const updateProgress = (chunkIndex: number, totalChunks: number, startTime: number) => {
+    const currentProgress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
+    setProgress(currentProgress);
+    setCurrentChunk(chunkIndex + 1);
+    setTotalChunks(totalChunks);
+
+    // Calculate upload speed
+    const elapsedTime = (Date.now() - startTime) / 1000; // in seconds
+    if (elapsedTime > 0) {
+      const averageSpeed = (chunkIndex + 1) * 5 / elapsedTime; // 5MB per chunk
+      setUploadSpeed(`${averageSpeed.toFixed(1)} MB/s`);
+
+      // Calculate time remaining
+      const chunksRemaining = totalChunks - (chunkIndex + 1);
+      const estimatedTimeRemaining = (chunksRemaining * 5) / averageSpeed; // in seconds
+      
+      if (estimatedTimeRemaining < 60) {
+        setTimeRemaining(`${Math.ceil(estimatedTimeRemaining)} seconds`);
+      } else {
+        setTimeRemaining(`${Math.ceil(estimatedTimeRemaining / 60)} minutes`);
+      }
+    }
+  };
+
+  const resetProgress = () => {
+    setProgress(0);
+    setCurrentChunk(0);
+    setTotalChunks(0);
+    setUploadSpeed('0 KB/s');
+    setTimeRemaining('Calculating...');
+  };
+
+  return {
+    progress,
+    currentChunk,
+    totalChunks,
+    uploadSpeed,
+    timeRemaining,
+    updateProgress,
+    resetProgress
+  };
+};
+
 export default function FileUpload({ onUploadSuccess, currentSessionId, onSessionCreated }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -82,6 +133,20 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const [error, setError] = useState('');
   const [compressionInfo, setCompressionInfo] = useState<{isCompressed: boolean; originalSize: number; compressedSize: number} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use the progress tracking hook
+  const {
+    progress,
+    currentChunk,
+    totalChunks,
+    uploadSpeed,
+    timeRemaining,
+    updateProgress,
+    resetProgress
+  } = useUploadProgress();
+
+  const [isChunkedUpload, setIsChunkedUpload] = useState<boolean>(false);
+  const [uploadStage, setUploadStage] = useState<'uploading' | 'processing' | 'complete'>('uploading');
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -117,14 +182,16 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
       return;
     }
 
-    if (file.size > 50 * 1024 * 1024) {
-      setError('File size must be less than 50MB');
+    if (file.size > 200 * 1024 * 1024) { // Increased to 200MB for chunked uploads
+      setError('File size must be less than 200MB');
       return;
     }
 
     setError('');
     setSelectedFile(file);
-    setCompressionInfo(null); // Reset compression info when new file is selected
+    setCompressionInfo(null);
+    resetProgress();
+    setUploadStage('uploading');
   };
 
   const handleUpload = async () => {
@@ -132,21 +199,57 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   
     setUploading(true);
     setError('');
+    resetProgress();
+    setIsChunkedUpload(selectedFile.size > 10 * 1024 * 1024);
+    setUploadStage('uploading');
   
     try {
       console.log('📤 Uploading file with isPermanent:', isPermanent);
       console.log('📤 File will be uploaded as:', isPermanent ? 'PERMANENT' : 'SESSION');
       
-      // Compress file before upload
-      const compressionResult = await FileCompressor.compressFile(selectedFile);
-      setCompressionInfo({
-        isCompressed: compressionResult.isCompressed,
-        originalSize: compressionResult.originalSize,
-        compressedSize: compressionResult.compressedSize
-      });
-  
-      // FIX: Use the correct API signature - just pass the File and isPermanent
-      const response = await uploadDocument(selectedFile, isPermanent);
+      let response;
+      const startTime = Date.now();
+
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        // Use chunked upload for large files
+        console.log('📦 Using chunked upload for large file');
+        
+        // Enhanced chunked upload with progress tracking
+        const CHUNK_SIZE = 5 * 1024 * 1024;
+        const totalChunks = Math.ceil(selectedFile.size / CHUNK_SIZE);
+        
+        // Start upload session
+        const startResponse = await uploadDocumentChunked(selectedFile, isPermanent, 
+          (chunkIndex: number) => {
+            updateProgress(chunkIndex, totalChunks, startTime);
+          }
+        );
+        
+        response = startResponse;
+      } else {
+        // Use regular upload for small files with compression
+        console.log('📤 Using regular upload for small file');
+        
+        // Compress file before upload (small files only)
+        const compressionResult = await FileCompressor.compressFile(selectedFile);
+        setCompressionInfo({
+          isCompressed: compressionResult.isCompressed,
+          originalSize: compressionResult.originalSize,
+          compressedSize: compressionResult.compressedSize
+        });
+
+        // Simulate progress for small files
+        for (let i = 0; i <= 100; i += 20) {
+          updateProgress(i / 20, 5, startTime);
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+        
+        response = await uploadDocument(selectedFile, isPermanent);
+      }
+
+      // Move to processing stage
+      setUploadStage('processing');
+      resetProgress();
       
       console.log('✅ Upload response:', response.data);
       
@@ -155,14 +258,28 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
         onSessionCreated(response.data.session_id);
       }
       
+      // Simulate processing stage
+      for (let i = 0; i <= 100; i += 10) {
+        updateProgress(i / 10, 10, Date.now());
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      setUploadStage('complete');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Show completion for 1 second
+      
       setSelectedFile(null);
       setCompressionInfo(null);
+      resetProgress();
+      setIsChunkedUpload(false);
       onUploadSuccess();
       
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
       console.error('Upload error:', err);
       setError(err.response?.data?.detail || err.message || 'Upload failed');
+      resetProgress();
+      setIsChunkedUpload(false);
+      setUploadStage('uploading');
     } finally {
       setUploading(false);
     }
@@ -172,8 +289,36 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setSelectedFile(null);
     setCompressionInfo(null);
     setError('');
+    resetProgress();
+    setUploadStage('uploading');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const getStageMessage = () => {
+    switch (uploadStage) {
+      case 'uploading':
+        return isChunkedUpload ? 'Uploading file in chunks...' : 'Uploading file...';
+      case 'processing':
+        return 'Processing document...';
+      case 'complete':
+        return 'Upload complete!';
+      default:
+        return 'Uploading...';
+    }
+  };
+
+  const getStageIcon = () => {
+    switch (uploadStage) {
+      case 'uploading':
+        return '📤';
+      case 'processing':
+        return '⚙️';
+      case 'complete':
+        return '✅';
+      default:
+        return '📤';
     }
   };
 
@@ -221,7 +366,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
               Select File
             </button>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Supported: PDF, DOCX, TXT, JPG, PNG (Max 50MB)
+              Supported: PDF, DOCX, TXT, JPG, PNG (Max 200MB)
             </p>
           </div>
         ) : (
@@ -235,13 +380,18 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {FileCompressor.formatBytes(selectedFile.size)}
-                  {compressionInfo && compressionInfo.isCompressed && (
+                  {compressionInfo && (
                     <span className="text-green-600 dark:text-green-400 ml-2">
                       → {FileCompressor.formatBytes(compressionInfo.compressedSize)} 
                       ({((compressionInfo.compressedSize / compressionInfo.originalSize) * 100).toFixed(1)}%)
                     </span>
                   )}
                 </p>
+                {isChunkedUpload && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                    📦 Will be uploaded in {Math.ceil(selectedFile.size / (5 * 1024 * 1024))} chunks
+                  </p>
+                )}
               </div>
               <button
                 onClick={removeSelectedFile}
@@ -266,77 +416,127 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
                 <div className="text-xs text-green-600 dark:text-green-400 mt-1">
                   {compressionInfo.isCompressed ? 
                     `Reduced by ${(((compressionInfo.originalSize - compressionInfo.compressedSize) / compressionInfo.originalSize) * 100).toFixed(1)}% - Faster upload!` : 
-                    'Image file - No compression applied to maintain quality'
+                    'No compression applied'
                   }
                 </div>
               </div>
             )}
 
-            {/* Document Type Selection */}
-            <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Document Type:
-              </label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer flex-1">
-                  <input
-                    type="radio"
-                    name="documentType"
-                    checked={isPermanent}
-                    onChange={() => setIsPermanent(true)}
-                    className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                    disabled={uploading}
-                  />
-                  <div className="flex-1">
-                    <span className="font-medium text-gray-900 dark:text-white">Permanent</span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Stored for 14 days, searchable in all sessions
-                    </p>
+            {/* Upload Progress */}
+            {uploading && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{getStageIcon()}</span>
+                    <span className="font-medium text-blue-700 dark:text-blue-300">
+                      {getStageMessage()}
+                    </span>
                   </div>
-                </label>
-                
-                <label className="flex items-center gap-2 cursor-pointer flex-1">
-                  <input
-                    type="radio"
-                    name="documentType"
-                    checked={!isPermanent}
-                    onChange={() => setIsPermanent(false)}
-                    className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
-                    disabled={uploading}
-                  />
-                  <div className="flex-1">
-                    <span className="font-medium text-gray-900 dark:text-white">Session Only</span>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Temporary (30 min), only in current session
-                    </p>
+                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                    {progress}%
+                  </span>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2.5">
+                  <div 
+                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${progress}%` }}
+                  ></div>
+                </div>
+
+                {/* Progress Stats */}
+                <div className="grid grid-cols-3 gap-4 text-xs text-blue-600 dark:text-blue-400">
+                  <div className="text-center">
+                    <div className="font-medium">
+                      {isChunkedUpload && uploadStage === 'uploading' 
+                        ? `${currentChunk}/${totalChunks} chunks` 
+                        : `${progress}%`
+                      }
+                    </div>
+                    <div className="text-blue-500 dark:text-blue-300">Progress</div>
                   </div>
-                </label>
-              </div>
-              
-              {/* Debug Info */}
-              <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-600 dark:text-blue-400">
-                📝 Will upload as: <strong>{isPermanent ? 'PERMANENT' : 'SESSION'}</strong>
-                {currentSessionId && !isPermanent && (
-                  <div>Using existing session: {currentSessionId}</div>
+                  <div className="text-center">
+                    <div className="font-medium">{uploadSpeed}</div>
+                    <div className="text-blue-500 dark:text-blue-300">Speed</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium">{timeRemaining}</div>
+                    <div className="text-blue-500 dark:text-blue-300">Remaining</div>
+                  </div>
+                </div>
+
+                {/* Stage-specific info */}
+                {uploadStage === 'processing' && (
+                  <div className="text-xs text-blue-600 dark:text-blue-400 text-center">
+                    ⚙️ Extracting text and generating embeddings...
+                  </div>
                 )}
               </div>
-            </div>
+            )}
+
+            {/* Document Type Selection */}
+            {!uploading && (
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Document Type:
+                </label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
+                    <input
+                      type="radio"
+                      name="documentType"
+                      checked={isPermanent}
+                      onChange={() => setIsPermanent(true)}
+                      className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                      disabled={uploading}
+                    />
+                    <div className="flex-1">
+                      <span className="font-medium text-gray-900 dark:text-white">Permanent</span>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Stored for 14 days, searchable in all sessions
+                      </p>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-center gap-2 cursor-pointer flex-1">
+                    <input
+                      type="radio"
+                      name="documentType"
+                      checked={!isPermanent}
+                      onChange={() => setIsPermanent(false)}
+                      className="w-4 h-4 text-blue-600 focus:ring-2 focus:ring-blue-500"
+                      disabled={uploading}
+                    />
+                    <div className="flex-1">
+                      <span className="font-medium text-gray-900 dark:text-white">Session Only</span>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        Temporary (30 min), only in current session
+                      </p>
+                    </div>
+                  </label>
+                </div>
+                
+                {/* Debug Info */}
+                <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-600 dark:text-blue-400">
+                  📝 Will upload as: <strong>{isPermanent ? 'PERMANENT' : 'SESSION'}</strong>
+                  {currentSessionId && !isPermanent && (
+                    <div>Using existing session: {currentSessionId}</div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Upload Button */}
-            <button
-              onClick={handleUpload}
-              disabled={uploading}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 disabled:transform-none"
-            >
-              {uploading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Uploading...
-                </div>
-              ) : (
-                `Upload as ${isPermanent ? 'Permanent' : 'Session'} Document`
-              )}
-            </button>
+            {!uploading && (
+              <button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 disabled:transform-none"
+              >
+                {`Upload as ${isPermanent ? 'Permanent' : 'Session'} Document`}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -344,15 +544,6 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
       {error && (
         <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
           <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-        </div>
-      )}
-
-      {/* Upload Status */}
-      {uploading && (
-        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <p className="text-sm text-blue-600 dark:text-blue-400 text-center">
-            ⏳ Uploading and processing document... This may take a moment.
-          </p>
         </div>
       )}
     </div>
