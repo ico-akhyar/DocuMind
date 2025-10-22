@@ -21,7 +21,7 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-// Compression utility
+// Enhanced Compression utility with Brotli
 class FileCompressor {
   static async compressFile(file: File): Promise<{ blob: Blob; isCompressed: boolean; originalSize: number; compressedSize: number }> {
     const fileExtension = file.name.split('.').pop()?.toLowerCase();
@@ -38,14 +38,14 @@ class FileCompressor {
       };
     }
 
-    console.log('🗜️ Compressing file:', file.name);
+    console.log('🗜️ Compressing file with Brotli:', file.name);
     
     try {
       // Read file content
       const arrayBuffer = await file.arrayBuffer();
       
-      // Create gzip compressed blob
-      const compressedStream = new CompressionStream('gzip');
+      // Use Brotli compression (much better than gzip)
+      const compressedStream = new CompressionStream('br'); // 'br' for Brotli
       const writer = compressedStream.writable.getWriter();
       writer.write(new Uint8Array(arrayBuffer));
       writer.close();
@@ -59,15 +59,16 @@ class FileCompressor {
         compressedSize: compressedBlob.size
       };
       
-      console.log('✅ Compression complete:', {
+      console.log('✅ Brotli compression complete:', {
         original: this.formatBytes(file.size),
         compressed: this.formatBytes(compressedBlob.size),
-        ratio: `${((compressedBlob.size / file.size) * 100).toFixed(1)}%`
+        ratio: `${((compressedBlob.size / file.size) * 100).toFixed(1)}%`,
+        reduction: `${((1 - (compressedBlob.size / file.size)) * 100).toFixed(1)}% reduction`
       });
       
       return compressionInfo;
     } catch (error) {
-      console.error('❌ Compression failed, using original file:', error);
+      console.error('❌ Brotli compression failed, using original file:', error);
       return {
         blob: file,
         isCompressed: false,
@@ -86,28 +87,32 @@ class FileCompressor {
   }
 }
 
-// FIXED: Updated function signature to match what FileUpload.tsx is calling
-export const uploadDocument = async (
-  fileBlob: Blob, 
-  originalFilename: string, 
-  isCompressed: boolean, 
-  isPermanent: boolean = true
-) => {
+export const uploadDocument = async (file: File, isPermanent: boolean = true) => {
   const formData = new FormData();
   
-  // Use appropriate filename
-  const uploadFilename = isCompressed ? `${originalFilename}.gz` : originalFilename;
+  // Compress file before upload
+  const compressionResult = await FileCompressor.compressFile(file);
   
-  formData.append('file', fileBlob, uploadFilename);
-  formData.append('original_filename', originalFilename);
-  formData.append('is_compressed', isCompressed.toString());
+  // Use original filename but indicate compression
+  const uploadFilename = compressionResult.isCompressed 
+    ? `${file.name}.br`
+    : file.name;
+
+  formData.append('file', compressionResult.blob, uploadFilename);
+  formData.append('original_filename', file.name); // Keep original name
+  formData.append('is_compressed', compressionResult.isCompressed.toString());
+  formData.append('is_compression_type', compressionResult.isCompressed ? 'brotli' : 'none');
   formData.append('is_permanent', isPermanent.toString());
 
   console.log('🔄 Upload details:', {
-    original: originalFilename,
+    original: file.name,
     uploadAs: uploadFilename,
-    compressed: isCompressed,
-    isPermanent: isPermanent
+    compressed: compressionResult.isCompressed,
+    compressionType: compressionResult.isCompressed ? 'brotli' : 'none',
+    originalSize: FileCompressor.formatBytes(compressionResult.originalSize),
+    compressedSize: FileCompressor.formatBytes(compressionResult.compressedSize),
+    ratio: `${((compressionResult.compressedSize / compressionResult.originalSize) * 100).toFixed(1)}%`,
+    reduction: `${((1 - (compressionResult.compressedSize / compressionResult.originalSize)) * 100).toFixed(1)}% reduction`
   });
 
   return api.post('/upload', formData, {
