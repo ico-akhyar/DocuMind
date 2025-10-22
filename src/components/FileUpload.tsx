@@ -15,6 +15,8 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const [isPermanent, setIsPermanent] = useState(true);
   const [error, setError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState<'preparing' | 'uploading' | 'processing' | null>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
