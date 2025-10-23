@@ -36,9 +36,9 @@ class FileUtils {
 export const uploadDocumentChunked = async (
   file: File, 
   isPermanent: boolean = true, 
-  onProgress?: (chunkIndex: number, totalChunks: number, uploadedBytes: number) => void
+  onProgress?: (chunkIndex: number, totalChunks: number, uploadedBytes: number, progress: number) => void
 ) => {
-  const CHUNK_SIZE = 2 * 1024 * 1024; // 2MB chunks
+  const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks (CHANGED FROM 2MB TO 5MB)
   const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
   
   console.log(`📦 Starting chunked upload: ${file.name}, ${totalChunks} chunks (${FileUtils.formatBytes(CHUNK_SIZE)} each)`);
@@ -53,7 +53,7 @@ export const uploadDocumentChunked = async (
     console.log('🆕 Starting upload session...');
     const startResponse = await api.post('/upload/start', startFormData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 30000
+      timeout: 120000
     });
 
     const { upload_id, total_chunks } = startResponse.data;
@@ -79,20 +79,22 @@ export const uploadDocumentChunked = async (
       try {
         const chunkResponse = await api.post('/upload/chunk', chunkFormData, {
           headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 60000 // 60 seconds per chunk
+          timeout: 120000 // 60 seconds per chunk
         });
 
         totalUploadedBytes += (end - start);
+        const progress = Math.round((totalUploadedBytes / file.size) * 100);
         
         console.log(`✅ Uploaded chunk ${chunkIndex + 1}/${totalChunks}`, {
           chunkSize: FileUtils.formatBytes(end - start),
           totalUploaded: FileUtils.formatBytes(totalUploadedBytes),
-          totalFileSize: FileUtils.formatBytes(file.size)
+          totalFileSize: FileUtils.formatBytes(file.size),
+          progress: `${progress}%`
         });
         
         // Call progress callback with accurate information
         if (onProgress) {
-          onProgress(chunkIndex, totalChunks, totalUploadedBytes);
+          onProgress(chunkIndex + 1, totalChunks, totalUploadedBytes, progress);
         }
 
         // Small delay between chunks to prevent overwhelming the server
@@ -123,7 +125,7 @@ export const uploadDocumentChunked = async (
 
     const completeResponse = await api.post('/upload/complete', completeFormData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: 30000
+      timeout: 120000
     });
 
     const totalTime = (Date.now() - startTime) / 1000;
@@ -141,15 +143,15 @@ export const uploadDocumentChunked = async (
 export const uploadDocument = async (
   file: File, 
   isPermanent: boolean = true,
-  onProgress?: (chunkIndex: number, totalChunks: number, uploadedBytes: number) => void
+  onProgress?: (chunkIndex: number, totalChunks: number, uploadedBytes: number, progress: number) => void
 ) => {
-  // Use chunked upload for files larger than 2MB (more reliable)
-  if (file.size > 2 * 1024 * 1024) {
+  // Use chunked upload for files larger than 5MB (CHANGED FROM 2MB TO 5MB)
+  if (file.size > 5 * 1024 * 1024) {
     console.log('📦 Using chunked upload for reliable transfer');
     return uploadDocumentChunked(file, isPermanent, onProgress);
   }
 
-  // Use regular upload for very small files
+  // Use regular upload for small files
   console.log('📤 Using direct upload for small file');
   const formData = new FormData();
   formData.append('file', file);
@@ -160,12 +162,12 @@ export const uploadDocument = async (
 
   // For small files, simulate progress
   if (onProgress) {
-    onProgress(0, 1, file.size); // 100% progress immediately
+    onProgress(1, 1, file.size, 100); // 100% progress immediately
   }
 
   return api.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 60000
+    timeout: 120000
   });
 };
 
