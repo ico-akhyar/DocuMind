@@ -91,53 +91,90 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setUploadStage('uploading');
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-  
-    setUploading(true);
-    setError('');
-    resetProgress();
-    setUploadStage('uploading');
-  
-    try {
-      console.log('📤 Starting upload process...');
-      
-      const startTime = Date.now();
-      let lastUpdateTime = startTime;
+  // FileUpload.tsx - Updated handleUpload function
+const handleUpload = async () => {
+  if (!selectedFile) return;
 
-      // Upload with progress tracking
-      const response = await uploadDocument(selectedFile, isPermanent);
-      
-      console.log('✅ Upload completed successfully');
-      
-      // Show processing stage
-      setUploadStage('processing');
-      setProgress(100);
-      
-      // If this is a session upload and we got a session ID, notify parent
-      if (!isPermanent && response.data.session_id && onSessionCreated) {
-        onSessionCreated(response.data.session_id);
+  setUploading(true);
+  setError('');
+  resetProgress();
+  setUploadStage('uploading');
+
+  try {
+    console.log('📤 Starting upload process...');
+    
+    const startTime = Date.now();
+    let lastUpdateTime = startTime;
+
+    // Upload with progress tracking
+    const response = await uploadDocument(
+      selectedFile, 
+      isPermanent,
+      // Progress callback function
+      (chunkIndex: number, totalChunks: number, uploadedBytes: number, progress: number) => {
+        const currentTime = Date.now();
+        const timeElapsed = (currentTime - startTime) / 1000; // in seconds
+        
+        // Calculate upload speed
+        if (timeElapsed > 0) {
+          const speed = uploadedBytes / timeElapsed; // bytes per second
+          setUploadSpeed(FileUtils.formatBytes(speed) + '/s');
+        }
+        
+        // Calculate time remaining
+        if (progress > 0 && timeElapsed > 0) {
+          const totalTimeEstimate = timeElapsed / (progress / 100);
+          const timeRemainingSeconds = totalTimeEstimate - timeElapsed;
+          
+          if (timeRemainingSeconds > 0) {
+            const minutes = Math.floor(timeRemainingSeconds / 60);
+            const seconds = Math.floor(timeRemainingSeconds % 60);
+            setTimeRemaining(`${minutes}m ${seconds}s`);
+          } else {
+            setTimeRemaining('Almost done...');
+          }
+        }
+        
+        // Update progress states
+        setCurrentChunk(chunkIndex);
+        setTotalChunks(totalChunks);
+        setUploadedBytes(uploadedBytes);
+        setProgress(progress);
+        
+        console.log(`📊 Progress update: ${chunkIndex}/${totalChunks} chunks, ${uploadedBytes} bytes, ${progress}%`);
       }
-      
-      // Show completion for 2 seconds
-      setUploadStage('complete');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Reset and cleanup
-      setSelectedFile(null);
-      resetProgress();
-      onUploadSuccess();
-      
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      
-    } catch (err: any) {
-      console.error('❌ Upload failed:', err);
-      const errorMessage = err.response?.data?.detail || err.message || 'Upload failed';
-      setError(errorMessage);
-    } finally {
-      setUploading(false);
+    );
+    
+    console.log('✅ Upload completed successfully');
+    
+    // Show processing stage
+    setUploadStage('processing');
+    setProgress(100);
+    
+    // If this is a session upload and we got a session ID, notify parent
+    if (!isPermanent && response.data.session_id && onSessionCreated) {
+      onSessionCreated(response.data.session_id);
     }
-  };
+    
+    // Show completion for 2 seconds
+    setUploadStage('complete');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    // Reset and cleanup
+    setSelectedFile(null);
+    resetProgress();
+    onUploadSuccess();
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    
+  } catch (err: any) {
+    console.error('❌ Upload failed:', err);
+    const errorMessage = err.response?.data?.detail || err.message || 'Upload failed';
+    setError(errorMessage);
+  } finally {
+    setUploading(false);
+  }
+};
 
   const removeSelectedFile = () => {
     setSelectedFile(null);
@@ -263,76 +300,67 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
               </button>
             </div>
 
-            {/* Upload Progress */}
-            {uploading && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{getStageIcon()}</span>
-                    <span className="font-medium text-blue-700 dark:text-blue-300">
-                      {getStageMessage()}
-                    </span>
-                  </div>
-                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                    {progress}%
-                  </span>
-                </div>
+            // In the JSX part of FileUpload.tsx, update the progress display:
+{uploadStage === 'uploading' && isChunkedUpload && (
+  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className="text-lg">{getStageIcon()}</span>
+        <span className="font-medium text-blue-700 dark:text-blue-300">
+          {getStageMessage()}
+        </span>
+      </div>
+      <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+        {progress}%
+      </span>
+    </div>
 
-                {/* Progress Bar */}
-                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-3">
-                  <div 
-                    className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
-                    style={{ width: `${progress}%` }}
-                  ></div>
-                </div>
+    {/* Progress Bar */}
+    <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-3">
+      <div 
+        className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+        style={{ width: `${progress}%` }}
+      ></div>
+    </div>
 
-                {/* Detailed Progress Info */}
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="text-center">
-                    <div className="font-semibold text-blue-700 dark:text-blue-300">
-                      {uploadStage === 'uploading' && isChunkedUpload 
-                        ? `Chunk ${currentChunk}/${totalChunks}`
-                        : `${progress}%`
-                      }
-                    </div>
-                    <div className="text-blue-600 dark:text-blue-400">Progress</div>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="font-semibold text-blue-700 dark:text-blue-300">
-                      {FileUtils.formatBytes(uploadedBytes)} / {FileUtils.formatBytes(selectedFile.size)}
-                    </div>
-                    <div className="text-blue-600 dark:text-blue-400">Uploaded</div>
-                  </div>
-                  
-                  <div className="text-center">
-                    <div className="font-semibold text-blue-700 dark:text-blue-300">
-                      {uploadSpeed}
-                    </div>
-                    <div className="text-blue-600 dark:text-blue-400">Speed</div>
-                  </div>
-                </div>
+    {/* Detailed Progress Info */}
+    <div className="grid grid-cols-4 gap-2 text-xs">
+      <div className="text-center">
+        <div className="font-semibold text-blue-700 dark:text-blue-300">
+          {currentChunk}/{totalChunks}
+        </div>
+        <div className="text-blue-600 dark:text-blue-400">Chunks</div>
+      </div>
+      
+      <div className="text-center">
+        <div className="font-semibold text-blue-700 dark:text-blue-300">
+          {FileUtils.formatBytes(uploadedBytes)} / {FileUtils.formatBytes(selectedFile.size)}
+        </div>
+        <div className="text-blue-600 dark:text-blue-400">Uploaded</div>
+      </div>
+      
+      <div className="text-center">
+        <div className="font-semibold text-blue-700 dark:text-blue-300">
+          {uploadSpeed}
+        </div>
+        <div className="text-blue-600 dark:text-blue-400">Speed</div>
+      </div>
+      
+      <div className="text-center">
+        <div className="font-semibold text-blue-700 dark:text-blue-300">
+          {timeRemaining}
+        </div>
+        <div className="text-blue-600 dark:text-blue-400">Remaining</div>
+      </div>
+    </div>
 
-                {/* Stage-specific messages */}
-                {uploadStage === 'uploading' && isChunkedUpload && (
-                  <div className="text-center text-xs text-blue-600 dark:text-blue-400">
-                    {timeRemaining !== 'Calculating...' && `⏱️ ${timeRemaining} remaining`}
-                  </div>
-                )}
-                
-                {uploadStage === 'processing' && (
-                  <div className="text-center text-xs text-blue-600 dark:text-blue-400">
-                    ⚙️ Extracting text and generating embeddings...
-                  </div>
-                )}
-
-                {uploadStage === 'complete' && (
-                  <div className="text-center text-xs text-green-600 dark:text-green-400">
-                    ✅ Upload completed successfully!
-                  </div>
-                )}
-              </div>
-            )}
+    {/* Real-time progress message */}
+    <div className="text-center text-xs text-blue-600 dark:text-blue-400">
+      {`Uploading chunk ${currentChunk} of ${totalChunks} (${progress}% complete)`}
+      {timeRemaining !== 'Calculating...' && ` - ⏱️ ${timeRemaining} remaining`}
+    </div>
+  </div>
+)}
 
             {/* Document Type Selection - Only show when not uploading */}
             {!uploading && (
