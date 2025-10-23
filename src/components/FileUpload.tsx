@@ -137,7 +137,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
           }
           
           // Update progress states
-          setCurrentChunk(chunkIndex);
+          setCurrentChunk(chunkIndex + 1);
           setTotalChunks(totalChunks);
           setUploadedBytes(uploadedBytes);
           setProgress(progress);
