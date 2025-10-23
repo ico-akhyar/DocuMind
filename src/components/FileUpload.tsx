@@ -35,6 +35,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
   const [uploadedBytes, setUploadedBytes] = useState(0);
   const [isChunkedUpload, setIsChunkedUpload] = useState<boolean>(false);
   const [uploadStage, setUploadStage] = useState<'uploading' | 'processing' | 'complete'>('uploading');
+  const [showProgress, setShowProgress] = useState(false);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -78,7 +79,7 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setError('');
     setSelectedFile(file);
     resetProgress();
-    setIsChunkedUpload(file.size > 2 * 1024 * 1024);
+    setIsChunkedUpload(file.size > 5 * 1024 * 1024);
   };
 
   const resetProgress = () => {
@@ -89,92 +90,92 @@ export default function FileUpload({ onUploadSuccess, currentSessionId, onSessio
     setTimeRemaining('Calculating...');
     setUploadedBytes(0);
     setUploadStage('uploading');
+    setShowProgress(false);
   };
 
-  // FileUpload.tsx - Updated handleUpload function
-const handleUpload = async () => {
-  if (!selectedFile) return;
+  const handleUpload = async () => {
+    if (!selectedFile) return;
 
-  setUploading(true);
-  setError('');
-  resetProgress();
-  setUploadStage('uploading');
-
-  try {
-    console.log('📤 Starting upload process...');
-    
-    const startTime = Date.now();
-    let lastUpdateTime = startTime;
-
-    // Upload with progress tracking
-    const response = await uploadDocument(
-      selectedFile, 
-      isPermanent,
-      // Progress callback function
-      (chunkIndex: number, totalChunks: number, uploadedBytes: number, progress: number) => {
-        const currentTime = Date.now();
-        const timeElapsed = (currentTime - startTime) / 1000; // in seconds
-        
-        // Calculate upload speed
-        if (timeElapsed > 0) {
-          const speed = uploadedBytes / timeElapsed; // bytes per second
-          setUploadSpeed(FileUtils.formatBytes(speed) + '/s');
-        }
-        
-        // Calculate time remaining
-        if (progress > 0 && timeElapsed > 0) {
-          const totalTimeEstimate = timeElapsed / (progress / 100);
-          const timeRemainingSeconds = totalTimeEstimate - timeElapsed;
-          
-          if (timeRemainingSeconds > 0) {
-            const minutes = Math.floor(timeRemainingSeconds / 60);
-            const seconds = Math.floor(timeRemainingSeconds % 60);
-            setTimeRemaining(`${minutes}m ${seconds}s`);
-          } else {
-            setTimeRemaining('Almost done...');
-          }
-        }
-        
-        // Update progress states
-        setCurrentChunk(chunkIndex);
-        setTotalChunks(totalChunks);
-        setUploadedBytes(uploadedBytes);
-        setProgress(progress);
-        
-        console.log(`📊 Progress update: ${chunkIndex}/${totalChunks} chunks, ${uploadedBytes} bytes, ${progress}%`);
-      }
-    );
-    
-    console.log('✅ Upload completed successfully');
-    
-    // Show processing stage
-    setUploadStage('processing');
-    setProgress(100);
-    
-    // If this is a session upload and we got a session ID, notify parent
-    if (!isPermanent && response.data.session_id && onSessionCreated) {
-      onSessionCreated(response.data.session_id);
-    }
-    
-    // Show completion for 2 seconds
-    setUploadStage('complete');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Reset and cleanup
-    setSelectedFile(null);
+    setUploading(true);
+    setError('');
     resetProgress();
-    onUploadSuccess();
-    
-    if (fileInputRef.current) fileInputRef.current.value = '';
-    
-  } catch (err: any) {
-    console.error('❌ Upload failed:', err);
-    const errorMessage = err.response?.data?.detail || err.message || 'Upload failed';
-    setError(errorMessage);
-  } finally {
-    setUploading(false);
-  }
-};
+    setUploadStage('uploading');
+    setShowProgress(true);
+
+    try {
+      console.log('📤 Starting upload process...');
+      
+      const startTime = Date.now();
+
+      // Upload with progress tracking
+      const response = await uploadDocument(
+        selectedFile, 
+        isPermanent,
+        // Progress callback function
+        (chunkIndex: number, totalChunks: number, uploadedBytes: number, progress: number) => {
+          const currentTime = Date.now();
+          const timeElapsed = (currentTime - startTime) / 1000; // in seconds
+          
+          // Calculate upload speed
+          if (timeElapsed > 0) {
+            const speed = uploadedBytes / timeElapsed; // bytes per second
+            setUploadSpeed(FileUtils.formatBytes(speed) + '/s');
+          }
+          
+          // Calculate time remaining
+          if (progress > 0 && timeElapsed > 0) {
+            const totalTimeEstimate = timeElapsed / (progress / 100);
+            const timeRemainingSeconds = totalTimeEstimate - timeElapsed;
+            
+            if (timeRemainingSeconds > 0) {
+              const minutes = Math.floor(timeRemainingSeconds / 60);
+              const seconds = Math.floor(timeRemainingSeconds % 60);
+              setTimeRemaining(`${minutes}m ${seconds}s`);
+            } else {
+              setTimeRemaining('Almost done...');
+            }
+          }
+          
+          // Update progress states
+          setCurrentChunk(chunkIndex);
+          setTotalChunks(totalChunks);
+          setUploadedBytes(uploadedBytes);
+          setProgress(progress);
+          
+          console.log(`📊 Progress update: ${chunkIndex}/${totalChunks} chunks, ${uploadedBytes} bytes, ${progress}%`);
+        }
+      );
+      
+      console.log('✅ Upload completed successfully');
+      
+      // Show processing stage
+      setUploadStage('processing');
+      setProgress(100);
+      
+      // If this is a session upload and we got a session ID, notify parent
+      if (!isPermanent && response.data.session_id && onSessionCreated) {
+        onSessionCreated(response.data.session_id);
+      }
+      
+      // Show completion for 2 seconds
+      setUploadStage('complete');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Reset and cleanup
+      setSelectedFile(null);
+      resetProgress();
+      onUploadSuccess();
+      
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      
+    } catch (err: any) {
+      console.error('❌ Upload failed:', err);
+      const errorMessage = err.response?.data?.detail || err.message || 'Upload failed';
+      setError(errorMessage);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const removeSelectedFile = () => {
     setSelectedFile(null);
@@ -214,9 +215,14 @@ const handleUpload = async () => {
   // Calculate chunks info
   const calculateChunkInfo = () => {
     if (!selectedFile) return { totalChunks: 0, chunkSize: '0 MB' };
-    const chunkSize = 2 * 1024 * 1024; // 2MB
+    const chunkSize = 5 * 1024 * 1024; // 5MB
     const total = Math.ceil(selectedFile.size / chunkSize);
     return { totalChunks: total, chunkSize: FileUtils.formatBytes(chunkSize) };
+  };
+
+  const truncateFileName = (fileName: string, maxLength: number = 30) => {
+    if (fileName.length <= maxLength) return fileName;
+    return fileName.substring(0, maxLength) + '...';
   };
 
   const chunkInfo = calculateChunkInfo();
@@ -272,10 +278,10 @@ const handleUpload = async () => {
           <div className="space-y-4">
             {/* File Preview */}
             <div className="flex items-center justify-center gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-              <File className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-              <div className="flex-1 text-left">
-                <p className="font-medium text-gray-900 dark:text-white truncate">
-                  {selectedFile.name}
+              <File className="h-8 w-8 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <div className="flex-1 text-left min-w-0">
+                <p className="font-medium text-gray-900 dark:text-white truncate" title={selectedFile.name}>
+                  {truncateFileName(selectedFile.name)}
                 </p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {FileUtils.formatBytes(selectedFile.size)}
@@ -293,74 +299,88 @@ const handleUpload = async () => {
               </div>
               <button
                 onClick={removeSelectedFile}
-                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors"
+                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded transition-colors flex-shrink-0"
                 disabled={uploading}
               >
                 <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
               </button>
             </div>
 
-            // In the JSX part of FileUpload.tsx, update the progress display:
-{uploadStage === 'uploading' && isChunkedUpload && (
-  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">{getStageIcon()}</span>
-        <span className="font-medium text-blue-700 dark:text-blue-300">
-          {getStageMessage()}
-        </span>
-      </div>
-      <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-        {progress}%
-      </span>
-    </div>
+            {/* Progress Display - Only show when upload is in progress */}
+            {showProgress && uploading && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{getStageIcon()}</span>
+                    <span className="font-medium text-blue-700 dark:text-blue-300">
+                      {getStageMessage()}
+                    </span>
+                  </div>
+                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                    {progress}%
+                  </span>
+                </div>
 
-    {/* Progress Bar */}
-    <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-3">
-      <div 
-        className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
-        style={{ width: `${progress}%` }}
-      ></div>
-    </div>
+                {/* Progress Bar */}
+                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-3">
+                  <div 
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${progress}%` }}
+                  ></div>
+                </div>
 
-    {/* Detailed Progress Info */}
-    <div className="grid grid-cols-4 gap-2 text-xs">
-      <div className="text-center">
-        <div className="font-semibold text-blue-700 dark:text-blue-300">
-          {currentChunk}/{totalChunks}
-        </div>
-        <div className="text-blue-600 dark:text-blue-400">Chunks</div>
-      </div>
-      
-      <div className="text-center">
-        <div className="font-semibold text-blue-700 dark:text-blue-300">
-          {FileUtils.formatBytes(uploadedBytes)} / {FileUtils.formatBytes(selectedFile.size)}
-        </div>
-        <div className="text-blue-600 dark:text-blue-400">Uploaded</div>
-      </div>
-      
-      <div className="text-center">
-        <div className="font-semibold text-blue-700 dark:text-blue-300">
-          {uploadSpeed}
-        </div>
-        <div className="text-blue-600 dark:text-blue-400">Speed</div>
-      </div>
-      
-      <div className="text-center">
-        <div className="font-semibold text-blue-700 dark:text-blue-300">
-          {timeRemaining}
-        </div>
-        <div className="text-blue-600 dark:text-blue-400">Remaining</div>
-      </div>
-    </div>
+                {/* Detailed Progress Info */}
+                <div className="grid grid-cols-4 gap-2 text-xs">
+                  <div className="text-center">
+                    <div className="font-semibold text-blue-700 dark:text-blue-300">
+                      {currentChunk}/{totalChunks > 0 ? totalChunks : chunkInfo.totalChunks}
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400">Chunks</div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="font-semibold text-blue-700 dark:text-blue-300">
+                      {FileUtils.formatBytes(uploadedBytes)} / {FileUtils.formatBytes(selectedFile.size)}
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400">Uploaded</div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="font-semibold text-blue-700 dark:text-blue-300">
+                      {uploadSpeed}
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400">Speed</div>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="font-semibold text-blue-700 dark:text-blue-300">
+                      {timeRemaining}
+                    </div>
+                    <div className="text-blue-600 dark:text-blue-400">Remaining</div>
+                  </div>
+                </div>
 
-    {/* Real-time progress message */}
-    <div className="text-center text-xs text-blue-600 dark:text-blue-400">
-      {`Uploading chunk ${currentChunk} of ${totalChunks} (${progress}% complete)`}
-      {timeRemaining !== 'Calculating...' && ` - ⏱️ ${timeRemaining} remaining`}
-    </div>
-  </div>
-)}
+                {/* Real-time progress message */}
+                {uploadStage === 'uploading' && isChunkedUpload && (
+                  <div className="text-center text-xs text-blue-600 dark:text-blue-400">
+                    {`Uploading chunk ${currentChunk} of ${totalChunks > 0 ? totalChunks : chunkInfo.totalChunks} (${progress}% complete)`}
+                    {timeRemaining !== 'Calculating...' && ` - ⏱️ ${timeRemaining} remaining`}
+                  </div>
+                )}
+
+                {uploadStage === 'processing' && (
+                  <div className="text-center text-xs text-blue-600 dark:text-blue-400">
+                    ⚙️ Extracting text and generating embeddings...
+                  </div>
+                )}
+
+                {uploadStage === 'complete' && (
+                  <div className="text-center text-xs text-green-600 dark:text-green-400">
+                    ✅ Upload completed successfully!
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Document Type Selection - Only show when not uploading */}
             {!uploading && (
