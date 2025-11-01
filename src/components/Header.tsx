@@ -35,26 +35,24 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo and Brand */}
-          <div className="flex items-center space-x-3">
-            <Link 
-              to="/" 
-              className="flex items-center space-x-3 group"
-            >
-              <img 
-                src="/assets/logo.png" 
-                alt="Logo" 
-                className="w-12 h-12 object-contain group-hover:scale-110 transition-transform duration-300"
-              />
-              <div className="flex flex-col">
-                <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  DocuMind
-                </h1>
-                {/* <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
-                  AI Document Assistant
-                </p> */}
-              </div>
-            </Link>
-          </div>
+<div className="flex items-center space-x-3">
+  <Link 
+    to="/" 
+    className="flex items-center space-x-3 group"
+  >
+    {/* Removed logo image */}
+    <div className="flex flex-col">
+      <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        DocuMind
+      </h1>
+      {/* Optional subtitle */}
+      <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">
+        By Oryvo AI
+      </p>
+    </div>
+  </Link>
+</div>
+
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-8">
