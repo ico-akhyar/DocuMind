@@ -29,25 +29,29 @@ export default function Dashboard() {
       <Header />
 
       {/* Dashboard Header Section */}
-      <div className="pt-20 pb-6 bg-gradient-to-br from-gray-900 to-blue-900 dark:from-gray-800 dark:to-blue-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center text-center space-y-2">
-            <img 
-              src="/assets/logo.png" 
-              alt="DocuMind Logo" 
-              className="w-40 h-40 object-contain"
-            />
-            <div>
-              <h1 className="text-3xl font-bold text-white">
-                DocuMind
-              </h1>
-              <p className="text-gray-300 mt-1 text-base">
-                Your AI Document Assistant - Upload, Process, and Ask Questions
-              </p>
-            </div>
-          </div>
-        </div>
+<div className="pt-20 pb-6 bg-gradient-to-br from-gray-900 to-blue-900 dark:from-gray-800 dark:to-blue-900">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="flex flex-col items-center text-center space-y-2">
+      <div>
+        <h1 className="text-3xl font-bold text-white">
+          DocuMind By Oryvo AI
+        </h1>
+        <p className="text-gray-300 mt-1 text-base">
+          Your AI Document Assistant — Upload, Process, and Ask Questions
+        </p>
+        <a 
+          href="https://oryvoai.com" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="mt-3 inline-block text-blue-400 hover:text-blue-300 underline"
+        >
+          Learn more →
+        </a>
       </div>
+    </div>
+  </div>
+</div>
+
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex gap-6">
